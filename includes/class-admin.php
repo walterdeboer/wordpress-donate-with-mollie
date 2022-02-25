@@ -1,5 +1,7 @@
 <?php
 
+use DonerenMetMollie\MollieApi;
+
 class Dmm_Admin {
 
     private $wpdb;
@@ -15,6 +17,45 @@ class Dmm_Admin {
         add_action('admin_menu', array($this, 'dmm_admin_menu'));
         add_action('admin_init', array($this, 'dmm_register_settings'));
         add_action('admin_post_dmm_export', array($this, 'dmm_export_donations'));
+        add_filter('plugin_row_meta', array($this, 'plugin_row_meta'), 10, 2);
+
+        if (!get_option('permalink_structure'))
+            add_action('admin_notices', array($this, 'dmm_admin_notice__warning'));
+    }
+
+    /**
+     * Admin notices
+     *
+     * @since 2.4.1
+     */
+    function dmm_admin_notice__warning() {
+        ?>
+        <div class="notice notice-warning is-dismissible">
+            <p><?php _e('In order for the plugin "Donate with Mollie" to function properly, it is necessary to enable permalinks in your <a href="options-permalink.php">Wordpress settings</a>.', 'doneren-met-mollie'); ?></p>
+        </div>
+        <?php
+    }
+
+    /**
+     * Plugin row meta
+     *
+     * @param $links
+     * @param $file
+     * @return array
+     */
+    function plugin_row_meta($links, $file)
+    {
+        if (DMM_PLUGIN_BASE == $file)
+        {
+            $row_meta = array(
+                'support'    => '<a href="https://support.wobbie.nl" target="_blank">' . esc_html__('Support', 'mollie-forms') . '</a>',
+                'feature-requests'    => '<a href="https://features.wobbie.nl" target="_blank">' . esc_html__('Feature requests', 'mollie-forms') . '</a>',
+                'donate'    => '<a href="https://wobbie.nl/doneren" target="_blank">' . esc_html__('Donate', 'mollie-forms') . '</a>'
+            );
+
+            return array_merge($links, $row_meta);
+        }
+        return (array) $links;
     }
 
     /**
@@ -24,9 +65,9 @@ class Dmm_Admin {
      */
     public function dmm_admin_menu() {
         add_menu_page(
-            __('Donate with Mollie', DMM_TXT_DOMAIN),
-            __('Donations', DMM_TXT_DOMAIN),
-            DMM_PLUGIN_ROLE,
+            __('Donate with Mollie', 'doneren-met-mollie'),
+            __('Donations', 'doneren-met-mollie'),
+            get_option('dmm_rights_donations', DMM_PLUGIN_ROLE),
             DMM_PAGE_DONATIONS,
             array(
                 $this,
@@ -39,9 +80,9 @@ class Dmm_Admin {
         {
             add_submenu_page(
                 DMM_PAGE_DONATIONS,
-                __('Subscriptions', DMM_TXT_DOMAIN) . ' | ' . __('Donate with Mollie', DMM_TXT_DOMAIN),
-                __('Subscriptions', DMM_TXT_DOMAIN),
-                DMM_PLUGIN_ROLE,
+                __('Subscriptions', 'doneren-met-mollie') . ' | ' . __('Donate with Mollie', 'doneren-met-mollie'),
+                __('Subscriptions', 'doneren-met-mollie'),
+                get_option('dmm_rights_subscriptions', DMM_PLUGIN_ROLE),
                 DMM_PAGE_SUBSCRIPTIONS,
                 array(
                     $this,
@@ -50,9 +91,9 @@ class Dmm_Admin {
             );
             add_submenu_page(
                 DMM_PAGE_DONATIONS,
-                __('Donors', DMM_TXT_DOMAIN) . ' | ' . __('Donate with Mollie', DMM_TXT_DOMAIN),
-                __('Donors', DMM_TXT_DOMAIN),
-                DMM_PLUGIN_ROLE,
+                __('Donors', 'doneren-met-mollie') . ' | ' . __('Donate with Mollie', 'doneren-met-mollie'),
+                __('Donors', 'doneren-met-mollie'),
+                get_option('dmm_rights_subscriptions', DMM_PLUGIN_ROLE),
                 DMM_PAGE_DONORS,
                 array(
                     $this,
@@ -63,8 +104,8 @@ class Dmm_Admin {
 
         add_submenu_page(
             DMM_PAGE_DONATIONS,
-            __('Settings', DMM_TXT_DOMAIN) . ' | ' . __('Donate with Mollie', DMM_TXT_DOMAIN),
-            __('Settings', DMM_TXT_DOMAIN),
+            __('Settings', 'doneren-met-mollie') . ' | ' . __('Donate with Mollie', 'doneren-met-mollie'),
+            __('Settings', 'doneren-met-mollie'),
             DMM_PLUGIN_ROLE,
             DMM_PAGE_SETTINGS,
             array(
@@ -76,9 +117,9 @@ class Dmm_Admin {
         // Hidden
         add_submenu_page(
             null,
-            __('Donation', DMM_TXT_DOMAIN),
-            __('Donation', DMM_TXT_DOMAIN),
-            DMM_PLUGIN_ROLE,
+            __('Donation', 'doneren-met-mollie'),
+            __('Donation', 'doneren-met-mollie'),
+            get_option('dmm_rights_donations', DMM_PLUGIN_ROLE),
             DMM_PAGE_DONATION,
             array(
                 $this,
@@ -97,9 +138,12 @@ class Dmm_Admin {
 
         register_setting('dmm-settings-recurring', 'dmm_recurring');
         register_setting('dmm-settings-recurring', 'dmm_recurring_interval');
+        register_setting('dmm-settings-recurring', 'dmm_default_interval');
         register_setting('dmm-settings-recurring', 'dmm_name_foundation');
 
         register_setting('dmm-settings-general', 'dmm_amount');
+        register_setting('dmm-settings-general', 'dmm_currency');
+        register_setting('dmm-settings-general', 'dmm_currency_switch');
         register_setting('dmm-settings-general', 'dmm_free_input');
         register_setting('dmm-settings-general', 'dmm_default_amount');
         register_setting('dmm-settings-general', 'dmm_minimum_amount');
@@ -108,6 +152,9 @@ class Dmm_Admin {
         register_setting('dmm-settings-general', 'dmm_redirect_success');
         register_setting('dmm-settings-general', 'dmm_redirect_failure');
         register_setting('dmm-settings-general', 'dmm_projects');
+        register_setting('dmm-settings-general', 'dmm_rights_donations');
+        register_setting('dmm-settings-general', 'dmm_rights_subscriptions');
+        register_setting('dmm-settings-general', 'dmm_metadata');
 
         register_setting('dmm-settings-form', 'dmm_form_fields');
         register_setting('dmm-settings-form', 'dmm_success_cls');
@@ -115,13 +162,7 @@ class Dmm_Admin {
         register_setting('dmm-settings-form', 'dmm_form_cls');
         register_setting('dmm-settings-form', 'dmm_fields_cls');
         register_setting('dmm-settings-form', 'dmm_button_cls');
-
-        if (get_option('dmm_recurring')){
-            $fields = get_option('dmm_form_fields');
-            $fields['Name'] = array('active' => 'On', 'required' => 'On');
-            $fields['Email address'] = array('active' => 'On', 'required' => 'On');
-            update_option('dmm_form_fields', $fields);
-        }
+        register_setting('dmm-settings-form', 'dmm_gdpr_link');
     }
 
     /**
@@ -130,48 +171,62 @@ class Dmm_Admin {
      * @return string
      * @since 1.0.0
      */
-    public function dmm_page_donations() {
-
-        try {
-            $mollie = new Mollie_API_Client;
-            if (get_option('dmm_mollie_apikey'))
-                $mollie->setApiKey(get_option('dmm_mollie_apikey'));
-            else
-            {
-                echo '<div class="error notice"><p>' . esc_html__('No API-key set', DMM_TXT_DOMAIN) . '</p></div>';
-                return;
-            }
-
-
-            if (isset($_GET['action']) && $_GET['action'] == 'refund' && isset($_GET['payment']) && check_admin_referer('refund-donation_' . $_GET['payment']))
-            {
-                $payment = $mollie->payments->get($_GET['payment']);
-                if ($payment->canBeRefunded())
-                {
-                    $refund = $mollie->payments->refund($payment);
-                    wp_redirect('?page=' . $_REQUEST['page'] . '&msg=refund-ok');
-                }
-                else
-                    wp_redirect('?page=' . $_REQUEST['page'] . '&msg=refund-nok');
-            }
-
-        } catch (Mollie_API_Exception $e) {
-            $dmm_msg =  "<div class=\"error notice\"><p>API call failed: " . htmlspecialchars($e->getMessage()) . "</p></div>";
+    public function dmm_page_donations()
+    {
+        if (!get_option('dmm_mollie_apikey')) {
+            echo '<div class="error notice"><p>' . esc_html__('No API-key set', 'doneren-met-mollie') . '</p></div>';
+            return;
         }
 
+        $mollie = new MollieApi(get_option('dmm_mollie_apikey'));
+
+        if (isset($_GET['action']) && $_GET['action'] == 'refund' && isset($_GET['payment']) && check_admin_referer('refund-donation_' . $_GET['payment']))
+        {
+            try {
+                $payment = $mollie->get('payments/' . sanitize_text_field($_GET['payment']));
+                $mollie->post('payments/' . $payment->id . '/refunds', array(
+                    'amount' => array(
+                        'currency'  => $payment->amount->currency,
+                        'value'     => $payment->amount->value
+                    )
+                ));
+
+                wp_redirect('?page=' . sanitize_text_field($_REQUEST['page']) . '&msg=refund-ok');
+            } catch (Exception $e) {
+                wp_redirect('?page=' . sanitize_text_field($_REQUEST['page']) . '&msg=refund-nok');
+            }
+        }
+
+        if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['payment']) && check_admin_referer('delete-donation_' . $_GET['payment']))
+        {
+            $update = $this->wpdb->query($this->wpdb->prepare("DELETE FROM " . DMM_TABLE_DONATIONS . " WHERE payment_id = %s",
+                $_GET['payment']
+            ));
+
+            if ($update)
+                wp_redirect('?page=' . sanitize_text_field($_REQUEST['page']) . '&msg=delete-ok');
+            else
+                wp_redirect('?page=' . sanitize_text_field($_REQUEST['page']) . '&msg=delete-nok');
+        }
 
         if (isset($_GET['msg']))
         {
             switch ($_GET['msg'])
             {
                 case 'refund-ok':
-                    $dmm_msg = '<div class="updated notice"><p>' . esc_html__('The donation is successful refunded to the donator', DMM_TXT_DOMAIN) . '</p></div>';
+                    $dmm_msg = '<div class="updated notice"><p>' . esc_html__('The donation is successful refunded to the donator', 'doneren-met-mollie') . '</p></div>';
                     break;
                 case 'refund-nok':
-                    $dmm_msg = '<div class="error notice"><p>' . esc_html__('The donation can not be refunded', DMM_TXT_DOMAIN) . '</p></div>';
+                    $dmm_msg = '<div class="error notice"><p>' . esc_html__('The donation can not be refunded', 'doneren-met-mollie') . '</p></div>';
+                    break;
+                case 'delete-ok':
+                    $dmm_msg = '<div class="updated notice"><p>' . esc_html__('The donation is successful deleted', 'doneren-met-mollie') . '</p></div>';
+                    break;
+                case 'delete-nok':
+                    $dmm_msg = '<div class="error notice"><p>' . esc_html__('The donation can not be deleted', 'doneren-met-mollie') . '</p></div>';
                     break;
                 case 'truncate-ok':
-                    $dmm_msg = '<div class="updated notice"><p>' . esc_html__('The donations have been successfully removed from the database', DMM_TXT_DOMAIN) . '</p></div>';
+                    $dmm_msg = '<div class="updated notice"><p>' . esc_html__('The donations have been successfully removed from the database', 'doneren-met-mollie') . '</p></div>';
                     break;
             }
         }
@@ -180,57 +235,81 @@ class Dmm_Admin {
         $dmmTable->prepare_items();
         ?>
         <div class="wrap">
-            <h2><?php esc_html_e('Donations', DMM_TXT_DOMAIN) ?></h2>
+            <h2><?php esc_html_e('Donations', 'doneren-met-mollie') ?></h2>
 
             <?php echo isset($dmm_msg) ? $dmm_msg : '';?>
 
-            <form action="admin.php">
+            <form action="admin.php" style="float: right;">
                 <input type="hidden" name="page" value="<?php echo DMM_PAGE_DONATIONS;?>">
 
-                <input type="text" name="search" placeholder="<?php esc_html_e('Search') ?>">
-                <input type="submit" value="<?php esc_html_e('Search') ?>">
+                <?php if (current_user_can('export')): ?>
+                    <a href="<?php echo admin_url('admin-post.php?action=dmm_export' . (isset($_GET['subscription']) ? '&subscription=' . sanitize_text_field($_GET['subscription']) : '') . (isset($_GET['search']) ? '&search=' . $_GET['search'] : ''));?>"><?php esc_html_e('Export', 'doneren-met-mollie') ?></a>
+                <?php endif ?>
+
+                <input type="text" name="search" value="<?php echo esc_attr(isset($_GET['search']) ? $_GET['search'] : '');?>" placeholder="<?php esc_html_e('Search') ?>">
+                <input type="submit" class="button action" value="<?php esc_html_e('Search') ?>">
             </form>
-            <a style="float: right;" href="<?php echo admin_url('admin-post.php?action=dmm_export' . (isset($_GET['subscription']) ? '&subscription=' . $_GET['subscription'] : '') . (isset($_GET['search']) ? '&search=' . $_GET['search'] : ''));?>"><?php esc_html_e('Export', DMM_TXT_DOMAIN) ?></a>
-            <?php $dmmTable->display();?>
+
+            <form method="post">
+                <div class="alignleft actions">
+                    <select name="action">
+                        <option value="" selected='selected'>-------</option>
+                        <option value="delete"><?php esc_html_e('Delete selected donations') ?></option>
+                    </select>
+                    <input type="hidden" name="page" value="<?php echo esc_attr($_REQUEST['page']) ?>" />
+                    <input type="submit" id="doaction" class="button action" value="Submit"  />
+                </div>
+
+                <?php $dmmTable->display();?>
+            </form>
         </div>
     <?php
     }
 
     public function dmm_export_donations()
     {
+        if (!current_user_can('export')) {
+            exit('No permissions');
+        }
+
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename=donations.csv');
         $output = fopen('php://output', 'w');
 
         fputcsv($output, array(
-            esc_html_e('Date/time', DMM_TXT_DOMAIN),
-            esc_html_e('Name', DMM_TXT_DOMAIN),
-            esc_html_e('Company name', DMM_TXT_DOMAIN),
-            esc_html_e('Email address', DMM_TXT_DOMAIN),
-            esc_html_e('Phone number', DMM_TXT_DOMAIN),
-            esc_html_e('Address', DMM_TXT_DOMAIN),
-            esc_html_e('Zipcode', DMM_TXT_DOMAIN),
-            esc_html_e('City', DMM_TXT_DOMAIN),
-            esc_html_e('Country', DMM_TXT_DOMAIN),
-            esc_html_e('Project', DMM_TXT_DOMAIN),
-            esc_html_e('Message', DMM_TXT_DOMAIN),
-            esc_html_e('Amount', DMM_TXT_DOMAIN),
-            esc_html_e('Status', DMM_TXT_DOMAIN),
-            esc_html_e('Payment method', DMM_TXT_DOMAIN),
-            esc_html_e('Donation ID', DMM_TXT_DOMAIN),
-            esc_html_e('Payment ID', DMM_TXT_DOMAIN),
+            __('Date/time', 'doneren-met-mollie'),
+            __('Name', 'doneren-met-mollie'),
+            __('Company name', 'doneren-met-mollie'),
+            __('Email address', 'doneren-met-mollie'),
+            __('Phone number', 'doneren-met-mollie'),
+            __('Address', 'doneren-met-mollie'),
+            __('Zipcode', 'doneren-met-mollie'),
+            __('City', 'doneren-met-mollie'),
+            __('Country', 'doneren-met-mollie'),
+            __('Project', 'doneren-met-mollie'),
+            __('Message', 'doneren-met-mollie'),
+            __('Currency', 'doneren-met-mollie'),
+            __('Amount', 'doneren-met-mollie'),
+            __('Status', 'doneren-met-mollie'),
+            __('Payment method', 'doneren-met-mollie'),
+            __('Recurring payment', 'doneren-met-mollie'),
+            __('Donation ID', 'doneren-met-mollie'),
+            __('Payment ID', 'doneren-met-mollie'),
         ));
 
         $where = '';
-        if (isset($_GET['subscription']))
-            $where .= ' WHERE subscription_id="' . esc_sql($_GET['subscription']) . '"';
+        if (isset($_GET['subscription'])) {
+            $subscription = sanitize_title_for_query($_GET['subscription']);
+            $where .= ' WHERE subscription_id="' . esc_sql($subscription) . '"';
+        }
 
-        if (isset($_GET['search']))
-            $where .= ($where ? ' AND' : ' WHERE') . ' (dm_name LIKE "%' . esc_sql($_GET['search']) . '%" OR dm_email LIKE "%' . esc_sql($_GET['search']) . '%" OR dm_company LIKE "%' . esc_sql($_GET['search']) . '%" OR donation_id LIKE "%' . esc_sql($_GET['search']) . '%" OR payment_id LIKE "%' . esc_sql($_GET['search']) . '%")';
+        if (isset($_GET['search'])) {
+            $search = sanitize_title_for_query($_GET['search']);
+            $where .= ($where ? ' AND' : ' WHERE') . ' (dm_name LIKE "%' . esc_sql($search) . '%" OR dm_email LIKE "%' . esc_sql($search) . '%" OR dm_company LIKE "%' . esc_sql($search) . '%" OR donation_id LIKE "%' . esc_sql($search) . '%" OR payment_id LIKE "%' . esc_sql($search) . '%")';
+        }
 
         $donations = $this->wpdb->get_results("SELECT * FROM " . DMM_TABLE_DONATIONS . $where . " ORDER BY time DESC");
-        foreach ($donations as $donation)
-        {
+        foreach ($donations as $donation) {
             fputcsv($output, array(
                 $donation->time,
                 $donation->dm_name,
@@ -242,10 +321,12 @@ class Dmm_Admin {
                 $donation->dm_city,
                 $donation->dm_country,
                 $donation->dm_project,
-                $donation->dm_message,
+                trim(preg_replace('/\s+/', ' ', $donation->dm_message)),
+                $donation->dm_currency,
                 $donation->dm_amount,
                 $donation->dm_status,
                 $donation->payment_method,
+                $donation->customer_id ? __('Yes', 'doneren-met-mollie') : __('No', 'doneren-met-mollie'),
                 $donation->donation_id,
                 $donation->payment_id,
             ));
@@ -257,7 +338,7 @@ class Dmm_Admin {
         $donation = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_DONATIONS . " WHERE id = '" . esc_sql($_REQUEST['id']) . "'");
         ?>
         <div class="wrap">
-            <h2><?php esc_html_e('Donation', DMM_TXT_DOMAIN) ?></h2>
+            <h2><?php esc_html_e('Donation', 'doneren-met-mollie') ?></h2>
 
             <table class="widefat fixed striped">
                 <thead>
@@ -270,62 +351,72 @@ class Dmm_Admin {
                 <tbody>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Name', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Name', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->dm_name);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Email address', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Email address', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->dm_email);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Company name', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Company name', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->dm_company);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Phone number', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Phone number', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->dm_phone);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Address', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Address', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->dm_address);?><br><?php echo esc_html($donation->dm_zipcode . ' ' . $donation->dm_city);?><br><?php echo esc_html($donation->dm_country);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Project', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Project', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->dm_project);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Message', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Message', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo nl2br(esc_html($donation->dm_message));?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Amount', DMM_TXT_DOMAIN);?></strong></th>
-                        <td class="column-b">&euro; <?php echo number_format($donation->dm_amount, 2, ',', '');?></td>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Amount', 'doneren-met-mollie');?></strong></th>
+                        <td class="column-b"><?php echo dmm_get_currency_symbol($donation->dm_currency) . ' ' . number_format($donation->dm_amount, dmm_get_currencies($donation->dm_currency), ',', '');?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Payment method', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Settlement amount', 'doneren-met-mollie');?></strong></th>
+                        <td class="column-b"><?php echo dmm_get_currency_symbol($donation->dm_settlement_currency) . ' ' . number_format($donation->dm_settlement_amount, dmm_get_currencies($donation->dm_settlement_currency ?: 'EUR'), ',', '');?></td>
+                    </tr>
+                    <tr>
+                        <th class="column-empty"></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Payment method', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->payment_method);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Payment status', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Recurring payment', 'doneren-met-mollie');?></strong></th>
+                        <td class="column-b"><?php echo esc_html($donation->customer_id ? __('Yes', 'doneren-met-mollie') : __('No', 'doneren-met-mollie'));?></td>
+                    </tr>
+                    <tr>
+                        <th class="column-empty"></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Payment status', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->dm_status);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Donation ID', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Donation ID', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->donation_id);?></td>
                     </tr>
                     <tr>
                         <th class="column-empty"></th>
-                        <th class="column-a" scope="row"><strong><?php esc_html_e('Payment ID', DMM_TXT_DOMAIN);?></strong></th>
+                        <th class="column-a" scope="row"><strong><?php esc_html_e('Payment ID', 'doneren-met-mollie');?></strong></th>
                         <td class="column-b"><?php echo esc_html($donation->payment_id);?></td>
                     </tr>
                 </tbody>
@@ -336,66 +427,89 @@ class Dmm_Admin {
 
     public function dmm_page_donors()
     {
+        if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['customer']) && check_admin_referer('delete-donor_' . $_GET['customer']))
+        {
+            $mollie = new MollieApi(get_option('dmm_mollie_apikey'));
+
+            try {
+                $mollie->delete('customers/' . sanitize_text_field($_GET['customer']));
+
+                $this->wpdb->query($this->wpdb->prepare("DELETE FROM " . DMM_TABLE_DONORS . " WHERE customer_id = %s",
+                    $_GET['customer']
+                ));
+
+                $this->wpdb->query($this->wpdb->prepare("UPDATE " . DMM_TABLE_SUBSCRIPTIONS . " SET sub_status = 'canceled' WHERE customer_id = %s",
+                    $_GET['customer']
+                ));
+
+                wp_redirect('?page=' . sanitize_text_field($_REQUEST['page']));
+            } catch (Exception $e) {
+                echo 'Error: ' . $e->getMessage();
+            }
+        }
+
         $dmmTable = new Dmm_Donors_Table();
         $dmmTable->prepare_items();
         ?>
         <div class="wrap">
-            <h2><?php esc_html_e('Donors', DMM_TXT_DOMAIN) ?></h2>
+            <h2><?php esc_html_e('Donors', 'doneren-met-mollie') ?></h2>
 
-            <?php
-            echo isset($dmm_msg) ? $dmm_msg : '';
+            <form method="post">
+                <div class="alignleft actions">
+                    <select name="action">
+                        <option value="" selected='selected'>-------</option>
+                        <option value="delete"><?php esc_html_e('Delete selected donors') ?></option>
+                    </select>
+                    <input type="hidden" name="page" value="<?php echo esc_attr($_REQUEST['page']) ?>" />
+                    <input type="submit" id="doaction" class="button action" value="Submit"  />
+                </div>
 
-            $dmmTable->display();
-            ?>
+                <?php $dmmTable->display();?>
+            </form>
         </div>
         <?php
     }
 
     public function dmm_page_subscriptions()
     {
-        try {
-            $mollie = new Mollie_API_Client;
-            if (get_option('dmm_mollie_apikey'))
-                $mollie->setApiKey(get_option('dmm_mollie_apikey'));
-            else
-            {
-                echo '<div class="error notice"><p>' . esc_html__('No API-key set', DMM_TXT_DOMAIN) . '</p></div>';
-                return;
-            }
-
-
-            if (isset($_GET['action']) && $_GET['action'] == 'cancel' && isset($_GET['subscription']) && check_admin_referer('cancel-subscription_' . $_GET['subscription']))
-            {
-                $customer = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_DONORS . " WHERE id = '" . esc_sql($_GET['customer']) . "'");
-                $subscription = $mollie->customers_subscriptions->withParentId($customer->customer_id)->get($_GET['subscription']);
-                $cancelledSub = $mollie->customers_subscriptions->withParentId($customer->customer_id)->cancel($subscription);
-
-                if ($cancelledSub->status == 'cancelled')
-                {
-                    $this->wpdb->query($this->wpdb->prepare("UPDATE " . DMM_TABLE_SUBSCRIPTIONS . " SET sub_status = %s WHERE subscription_id = %s",
-                        $cancelledSub->status,
-                        $_GET['subscription']
-                    ));
-                    wp_redirect('?page=' . $_REQUEST['page'] . '&msg=cancel-ok');
-                }
-                else
-                    wp_redirect('?page=' . $_REQUEST['page'] . '&msg=cancel-nok&status=' . $cancelledSub->status);
-            }
-
-        } catch (Mollie_API_Exception $e) {
-            $dmm_msg =  "<div class=\"error notice\"><p>API call failed: " . htmlspecialchars($e->getMessage()) . "</p></div>";
+        if (!get_option('dmm_mollie_apikey')) {
+            echo '<div class="error notice"><p>' . esc_html__('No API-key set', 'doneren-met-mollie') . '</p></div>';
+            return;
         }
 
+        $mollie = new MollieApi(get_option('dmm_mollie_apikey'));
+
+        if (isset($_GET['action']) && $_GET['action'] == 'cancel' && isset($_GET['subscription']) && check_admin_referer('cancel-subscription_' . $_GET['subscription']))
+        {
+            $customer = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_DONORS . " WHERE id = '" . esc_sql(sanitize_title_for_query($_GET['customer'])) . "'");
+
+            try {
+                $cancelledSub = $mollie->delete('customers/' . $customer->customer_id . '/subscriptions/' . sanitize_text_field($_GET['subscription']));
+            } catch (Exception $e) {
+                wp_redirect('?page=' . sanitize_text_field($_REQUEST['page']) . '&msg=cancel-nok&status=unknown');
+            }
+
+            if ($cancelledSub->status == 'canceled')
+            {
+                $this->wpdb->query($this->wpdb->prepare("UPDATE " . DMM_TABLE_SUBSCRIPTIONS . " SET sub_status = %s WHERE subscription_id = %s",
+                    $cancelledSub->status,
+                    $_GET['subscription']
+                ));
+                wp_redirect('?page=' . sanitize_text_field($_REQUEST['page']) . '&msg=cancel-ok');
+            }
+            else
+                wp_redirect('?page=' . sanitize_text_field($_REQUEST['page']) . '&msg=cancel-nok&status=' . $cancelledSub->status);
+        }
 
         if (isset($_GET['msg']))
         {
             switch ($_GET['msg'])
             {
                 case 'cancel-ok':
-                    $dmm_msg = '<div class="updated notice"><p>' . esc_html__('The subscription is successful cancelled', DMM_TXT_DOMAIN) . '</p></div>';
+                    $dmm_msg = '<div class="updated notice"><p>' . esc_html__('The subscription is successful cancelled', 'doneren-met-mollie') . '</p></div>';
                     break;
                 case 'cancel-nok':
-                    $dmm_msg = '<div class="error notice"><p>' . esc_html__('The subscription is not cancelled', DMM_TXT_DOMAIN) . '</p></div>';
+                    $dmm_msg = '<div class="error notice"><p>' . esc_html__('The subscription is not cancelled', 'doneren-met-mollie') . '</p></div>';
                     break;
             }
         }
@@ -404,7 +518,7 @@ class Dmm_Admin {
         $dmmTable->prepare_items();
         ?>
         <div class="wrap">
-            <h2><?php esc_html_e('Subscriptions', DMM_TXT_DOMAIN) ?></h2>
+            <h2><?php esc_html_e('Subscriptions', 'doneren-met-mollie') ?></h2>
 
             <?php
             echo isset($dmm_msg) ? $dmm_msg : '';
@@ -420,14 +534,17 @@ class Dmm_Admin {
         if (!isset($_GET['tab']))
             $tab = 'general';
         else
-            $tab = $_GET['tab'];
+            $tab = sanitize_text_field($_GET['tab']);
         ?>
         <div class="wrap">
             <h2 class="nav-tab-wrapper">
-                <a href="?page=<?php echo DMM_PAGE_SETTINGS ?>" class="nav-tab<?php echo $tab == 'general' ? ' nav-tab-active' : '';?>"><?php esc_html_e('General', DMM_TXT_DOMAIN);?></a>
-                <a href="?page=<?php echo DMM_PAGE_SETTINGS ?>&tab=form" class="nav-tab<?php echo $tab == 'form' ? ' nav-tab-active' : '';?>"><?php esc_html_e('Form', DMM_TXT_DOMAIN);?></a>
-                <a href="?page=<?php echo DMM_PAGE_SETTINGS ?>&tab=mollie" class="nav-tab<?php echo $tab == 'mollie' ? ' nav-tab-active' : '';?>"><?php esc_html_e('Mollie settings', DMM_TXT_DOMAIN);?></a>
-                <a href="?page=<?php echo DMM_PAGE_SETTINGS ?>&tab=recurring" class="nav-tab<?php echo $tab == 'recurring' ? ' nav-tab-active' : '';?>"><?php esc_html_e('Recurring payments', DMM_TXT_DOMAIN);?></a>
+                <a href="?page=<?php echo DMM_PAGE_SETTINGS ?>" class="nav-tab<?php echo $tab === 'general' ? ' nav-tab-active' : '';?>"><?php esc_html_e('General', 'doneren-met-mollie');?></a>
+                <a href="?page=<?php echo DMM_PAGE_SETTINGS ?>&tab=form" class="nav-tab<?php echo $tab === 'form' ? ' nav-tab-active' : '';?>"><?php esc_html_e('Form', 'doneren-met-mollie');?></a>
+                <a href="?page=<?php echo DMM_PAGE_SETTINGS ?>&tab=mollie" class="nav-tab<?php echo $tab === 'mollie' ? ' nav-tab-active' : '';?>"><?php esc_html_e('Mollie settings', 'doneren-met-mollie');?></a>
+                <a href="?page=<?php echo DMM_PAGE_SETTINGS ?>&tab=recurring" class="nav-tab<?php echo $tab === 'recurring' ? ' nav-tab-active' : '';?>"><?php esc_html_e('Recurring payments', 'doneren-met-mollie');?></a>
+                <a href="https://wobbie.nl/doneren" target="_blank" class="nav-tab" style="float: right"><?php esc_html_e('Donate', 'doneren-met-mollie');?></a>
+                <a href="https://features.wobbie.nl" target="_blank" class="nav-tab" style="float: right"><?php esc_html_e('Feature Requests', 'doneren-met-mollie');?></a>
+                <a href="https://support.wobbie.nl" target="_blank" class="nav-tab" style="float: right"><?php esc_html_e('Support', 'doneren-met-mollie');?></a>
             </h2>
             <?php
             settings_errors();
@@ -461,16 +578,41 @@ class Dmm_Admin {
                 <tbody>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Amounts', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Currency', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
-                            <input type="text" size="50" name="dmm_amount" value="<?php echo esc_attr(get_option('dmm_amount'));?>"><br>
-                            <small><?php printf(esc_html__('Separate amounts with /. Example: "%s"', DMM_TXT_DOMAIN), '5,00/10,00/25,00/50,00');?></small>
+                            <select name="dmm_currency">
+                                <?php foreach (dmm_get_currencies() as $currency => $decimals): ?>
+                                    <option value="<?php echo esc_attr($currency);?>" <?php echo (get_option('dmm_currency') === $currency ? 'selected' : '');?>><?php echo esc_attr($currency);?></option>
+                                <?php endforeach;?>
+                            </select><br>
+                            <small><?php esc_html_e('Default currency used for preset amounts', 'doneren-met-mollie');?></small>
                         </td>
                     </tr>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Free input', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Amounts', 'doneren-met-mollie');?></label>
+                        </th>
+                        <td class="forminp">
+                            <input type="text" size="50" name="dmm_amount" value="<?php echo esc_attr(get_option('dmm_amount'));?>"><br>
+                            <small><?php printf(esc_html__('Separate amounts with /. Example: "%s"', 'doneren-met-mollie'), '5,00/10,00/25,00/50,00');?></small>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row" class="titledesc">
+                            <label><?php esc_html_e('Donor can choose currency', 'doneren-met-mollie');?></label>
+                        </th>
+                        <td class="forminp">
+                            <select name="dmm_currency_switch">
+                                <option value="0"><?php esc_html_e('No', 'doneren-met-mollie');?></option>
+                                <option value="1" <?php echo (get_option('dmm_currency_switch') == '1' ? 'selected' : '');?>><?php esc_html_e('Yes', 'doneren-met-mollie');?></option>
+                            </select><br>
+                            <small><?php esc_html_e('If enabled, the donor can choose their own currency for donations', 'doneren-met-mollie');?></small>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row" class="titledesc">
+                            <label><?php esc_html_e('Free input', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
                             <input type="checkbox" name="dmm_free_input" <?php echo (get_option('dmm_free_input', 0) ? 'checked' : '');?>>
@@ -478,7 +620,7 @@ class Dmm_Admin {
                     </tr>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Default amount', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Default amount', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
                             <input type="text" size="50" name="dmm_default_amount" value="<?php echo esc_attr(get_option('dmm_default_amount'));?>">
@@ -486,7 +628,7 @@ class Dmm_Admin {
                     </tr>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Minimum amount', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Minimum amount', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
                             <input type="text" size="50" name="dmm_minimum_amount" value="<?php echo esc_attr(get_option('dmm_minimum_amount'));?>">
@@ -494,41 +636,76 @@ class Dmm_Admin {
                     </tr>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Payment description', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Payment description', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
-                            <input type="text" size="50" name="dmm_payment_description" value="<?php echo esc_attr(get_option('dmm_payment_description'));?>"><br>
-                            <small><?php printf(esc_html__('You can use: %s', DMM_TXT_DOMAIN), '{id} {name} {email} {project} {amount} {company}');?></small>
+                            <input type="text" size="50" name="dmm_payment_description" value="<?php echo esc_attr(get_option('dmm_payment_description', __('Donation') . ' {id}'));?>"><br>
+                            <small><?php printf(esc_html__('You can use: %s', 'doneren-met-mollie'), '{id} {name} {email} {project} {amount} {company} {interval}');?></small>
                         </td>
                     </tr>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Payment methods', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Payment methods', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
                             <select name="dmm_methods_display">
-                                <option value="list"><?php esc_html_e('Icons & text', DMM_TXT_DOMAIN);?></option>
-                                <option value="list_no_icons" <?php echo (get_option('dmm_methods_display') == 'list_no_icons' ? 'selected' : '');?>><?php esc_html_e('Only text', DMM_TXT_DOMAIN);?></option>
-                                <option value="list_icons" <?php echo (get_option('dmm_methods_display') == 'list_icons' ? 'selected' : '');?>><?php esc_html_e('Only icons', DMM_TXT_DOMAIN);?></option>
-                                <option value="dropdown" <?php echo (get_option('dmm_methods_display') == 'dropdown' ? 'selected' : '');?>><?php esc_html_e('Dropdown', DMM_TXT_DOMAIN);?></option>
+                                <option value="list"><?php esc_html_e('Icons & text', 'doneren-met-mollie');?></option>
+                                <option value="list_no_icons" <?php echo (get_option('dmm_methods_display') === 'list_no_icons' ? 'selected' : '');?>><?php esc_html_e('Only text', 'doneren-met-mollie');?></option>
+                                <option value="list_icons" <?php echo (get_option('dmm_methods_display') === 'list_icons' ? 'selected' : '');?>><?php esc_html_e('Only icons', 'doneren-met-mollie');?></option>
+                                <option value="dropdown" <?php echo (get_option('dmm_methods_display') === 'dropdown' ? 'selected' : '');?>><?php esc_html_e('Dropdown', 'doneren-met-mollie');?></option>
                             </select>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row" class="titledesc"><?php esc_html_e('Page after successful donation', DMM_TXT_DOMAIN);?></th>
+                        <th scope="row" class="titledesc"><?php esc_html_e('Page after successful donation', 'doneren-met-mollie');?></th>
                         <td class="forminp"><?php $dmm_redirect_success = $this->get_page_id_by_slug(get_option('dmm_redirect_success'));wp_dropdown_pages(array('value_field' => 'post_name', 'selected' => $dmm_redirect_success, 'name' => 'dmm_redirect_success', 'show_option_no_change' => '-- ' . __('Default') . ' --'));?></td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row" class="titledesc"><?php esc_html_e('Page after failed donation', DMM_TXT_DOMAIN);?></th>
+                        <th scope="row" class="titledesc"><?php esc_html_e('Page after failed donation', 'doneren-met-mollie');?></th>
                         <td class="forminp"><?php $dmm_redirect_failure = $this->get_page_id_by_slug(get_option('dmm_redirect_failure'));wp_dropdown_pages(array('value_field' => 'post_name', 'selected' => $dmm_redirect_failure, 'name' => 'dmm_redirect_failure', 'show_option_no_change' => '-- ' . __('Default') . ' --'));?></td>
                     </tr>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Projects', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Projects', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
                             <textarea rows="10" name="dmm_projects" style="width: 370px;"><?php echo esc_attr(get_option('dmm_projects'));?></textarea><br>
-                            <small><?php esc_html_e('Each project on a new line', DMM_TXT_DOMAIN);?></small>
+                            <small><?php esc_html_e('Each project on a new line', 'doneren-met-mollie');?></small>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row" class="titledesc">
+                            <label><?php esc_html_e('Send metadata to Mollie', 'doneren-met-mollie');?></label>
+                        </th>
+                        <td class="forminp">
+                            <select name="dmm_metadata">
+                                <option value="1"><?php esc_html_e('Yes', 'doneren-met-mollie');?></option>
+                                <option value="0" <?php echo (get_option('dmm_metadata') == '0' ? 'selected' : '');?>><?php esc_html_e('No', 'doneren-met-mollie');?></option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row" class="titledesc">
+                            <label><?php esc_html_e('Rights donations', 'doneren-met-mollie');?></label>
+                        </th>
+                        <td class="forminp">
+                            <select name="dmm_rights_donations">
+                                <option value="edit_dashboard"><?php esc_html_e('Administrator', 'doneren-met-mollie');?></option>
+                                <option value="edit_pages" <?php echo (get_option('dmm_rights_donations') === 'edit_pages' ? 'selected' : '');?>><?php esc_html_e('Editor', 'doneren-met-mollie');?></option>
+                                <option value="edit_posts" <?php echo (get_option('dmm_rights_donations') === 'edit_posts' ? 'selected' : '');?>><?php esc_html_e('Author', 'doneren-met-mollie');?></option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row" class="titledesc">
+                            <label><?php esc_html_e('Rights subscriptions', 'doneren-met-mollie');?></label>
+                        </th>
+                        <td class="forminp">
+                            <select name="dmm_rights_subscriptions">
+                                <option value="edit_dashboard"><?php esc_html_e('Administrator', 'doneren-met-mollie');?></option>
+                                <option value="edit_pages" <?php echo (get_option('dmm_rights_subscriptions') === 'edit_pages' ? 'selected' : '');?>><?php esc_html_e('Editor', 'doneren-met-mollie');?></option>
+                                <option value="edit_posts" <?php echo (get_option('dmm_rights_subscriptions') === 'edit_posts' ? 'selected' : '');?>><?php esc_html_e('Author', 'doneren-met-mollie');?></option>
+                            </select>
                         </td>
                     </tr>
                 </tbody>
@@ -546,7 +723,7 @@ class Dmm_Admin {
         <form method="post" action="options.php">
             <?php settings_fields('dmm-settings-form');?>
 
-            <h3><?php esc_html_e('Fields', DMM_TXT_DOMAIN);?></h3>
+            <h3><?php esc_html_e('Fields', 'doneren-met-mollie');?></h3>
             <table class="form-table">
                 <tbody>
                 <tr valign="top">
@@ -555,53 +732,59 @@ class Dmm_Admin {
                             <thead>
                                 <tr valign="top">
                                     <th id="empty" class="manage-column column-empty" style="width:5px;">&nbsp;</th>
-                                    <th id="field" class="manage-column column-field"><?php esc_html_e('Field', DMM_TXT_DOMAIN);?></th>
-                                    <th id="active" class="manage-column column-active"><?php esc_html_e('Active', DMM_TXT_DOMAIN);?></th>
-                                    <th id="required" class="manage-column column-required"><?php esc_html_e('Required', DMM_TXT_DOMAIN);?></th>
+                                    <th id="field" class="manage-column column-field"><?php esc_html_e('Field', 'doneren-met-mollie');?></th>
+                                    <th id="active" class="manage-column column-active"><?php esc_html_e('Active', 'doneren-met-mollie');?></th>
+                                    <th id="required" class="manage-column column-required"><?php esc_html_e('Required', 'doneren-met-mollie');?></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <th class="column-empty"></th>
-                                    <th class="column-field" scope="row"><?php esc_html_e('Name', DMM_TXT_DOMAIN);?></th>
+                                    <th class="column-field" scope="row"><?php esc_html_e('Name', 'doneren-met-mollie');?></th>
                                     <td class="column-active"><input type="checkbox" name="dmm_form_fields[Name][active]" <?php echo (isset($dmm_form_fields['Name']['active']) ? 'checked' : '');?>></td>
                                     <td class="column-required"><input type="checkbox" name="dmm_form_fields[Name][required]" <?php echo (isset($dmm_form_fields['Name']['required']) ? 'checked' : '');?>></td>
                                 </tr>
                                 <tr>
                                     <th class="column-empty"></th>
-                                    <th class="column-field" scope="row"><?php esc_html_e('Email address', DMM_TXT_DOMAIN);?></th>
+                                    <th class="column-field" scope="row"><?php esc_html_e('Email address', 'doneren-met-mollie');?></th>
                                     <td class="column-active"><input type="checkbox" name="dmm_form_fields[Email address][active]" <?php echo (isset($dmm_form_fields['Email address']['active']) ? 'checked' : '');?>></td>
                                     <td class="column-required"><input type="checkbox" name="dmm_form_fields[Email address][required]" <?php echo (isset($dmm_form_fields['Email address']['required']) ? 'checked' : '');?>></td>
                                 </tr>
                                 <tr>
                                     <th class="column-empty"></th>
-                                    <th class="column-field" scope="row"><?php esc_html_e('Phone number', DMM_TXT_DOMAIN);?></th>
+                                    <th class="column-field" scope="row"><?php esc_html_e('Phone number', 'doneren-met-mollie');?></th>
                                     <td class="column-active"><input type="checkbox" name="dmm_form_fields[Phone number][active]" <?php echo (isset($dmm_form_fields['Phone number']['active']) ? 'checked' : '');?>></td>
                                     <td class="column-required"><input type="checkbox" name="dmm_form_fields[Phone number][required]" <?php echo (isset($dmm_form_fields['Phone number']['required']) ? 'checked' : '');?>></td>
                                 </tr>
                                 <tr>
                                     <th class="column-empty"></th>
-                                    <th class="column-field" scope="row"><?php esc_html_e('Address', DMM_TXT_DOMAIN);?></th>
+                                    <th class="column-field" scope="row"><?php esc_html_e('Address', 'doneren-met-mollie');?></th>
                                     <td class="column-active"><input type="checkbox" name="dmm_form_fields[Address][active]" <?php echo (isset($dmm_form_fields['Address']['active']) ? 'checked' : '');?>></td>
                                     <td class="column-required"><input type="checkbox" name="dmm_form_fields[Address][required]" <?php echo (isset($dmm_form_fields['Address']['required']) ? 'checked' : '');?>></td>
                                 </tr>
                                 <tr>
                                     <th class="column-empty"></th>
-                                    <th class="column-field" scope="row"><?php esc_html_e('Company name', DMM_TXT_DOMAIN);?></th>
+                                    <th class="column-field" scope="row"><?php esc_html_e('Company name', 'doneren-met-mollie');?></th>
                                     <td class="column-active"><input type="checkbox" name="dmm_form_fields[Company name][active]" <?php echo (isset($dmm_form_fields['Company name']['active']) ? 'checked' : '');?>></td>
                                     <td class="column-required"><input type="checkbox" name="dmm_form_fields[Company name][required]" <?php echo (isset($dmm_form_fields['Company name']['required']) ? 'checked' : '');?>></td>
                                 </tr>
                                 <tr>
                                     <th class="column-empty"></th>
-                                    <th class="column-field" scope="row"><?php esc_html_e('Message', DMM_TXT_DOMAIN);?></th>
+                                    <th class="column-field" scope="row"><?php esc_html_e('Message', 'doneren-met-mollie');?></th>
                                     <td class="column-active"><input type="checkbox" name="dmm_form_fields[Message][active]" <?php echo (isset($dmm_form_fields['Message']['active']) ? 'checked' : '');?>></td>
                                     <td class="column-required"><input type="checkbox" name="dmm_form_fields[Message][required]" <?php echo (isset($dmm_form_fields['Message']['required']) ? 'checked' : '');?>></td>
                                 </tr>
                                 <tr>
                                     <th class="column-empty"></th>
-                                    <th class="column-field" scope="row"><?php esc_html_e('Project', DMM_TXT_DOMAIN);?></th>
+                                    <th class="column-field" scope="row"><?php esc_html_e('Project', 'doneren-met-mollie');?></th>
                                     <td class="column-active"><input type="checkbox" name="dmm_form_fields[Project][active]" <?php echo (isset($dmm_form_fields['Project']['active']) ? 'checked' : '');?>></td>
                                     <td class="column-required"><input type="checkbox" name="dmm_form_fields[Project][required]" <?php echo (isset($dmm_form_fields['Project']['required']) ? 'checked' : '');?>></td>
+                                </tr>
+                                <tr>
+                                    <th class="column-empty"></th>
+                                    <th class="column-field" scope="row"><?php esc_html_e('GDPR checkbox', 'doneren-met-mollie');?></th>
+                                    <td class="column-active"><input type="checkbox" name="dmm_form_fields[GDPR checkbox][active]" <?php echo (isset($dmm_form_fields['GDPR checkbox']['active']) ? 'checked' : '');?>></td>
+                                    <td class="column-required"><input type="checkbox" name="dmm_form_fields[GDPR checkbox][required]" <?php echo (isset($dmm_form_fields['GDPR checkbox']['required']) ? 'checked' : '');?>></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -610,12 +793,26 @@ class Dmm_Admin {
                 </tbody>
             </table>
 
-            <h3><?php esc_html_e('Classes', DMM_TXT_DOMAIN);?></h3>
+            <h3><?php esc_html_e('GDPR checkbox', 'doneren-met-mollie');?></h3>
             <table class="form-table">
                 <tbody>
                 <tr valign="top">
                     <th scope="row" class="titledesc">
-                        <label><?php esc_html_e('Form class', DMM_TXT_DOMAIN);?></label>
+                        <label><?php esc_html_e('Link to privacy policy', 'doneren-met-mollie');?></label>
+                    </th>
+                    <td class="forminp">
+                        <input type="text" size="50" name="dmm_gdpr_link" value="<?php echo esc_attr(get_option('dmm_gdpr_link'));?>">
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+
+            <h3><?php esc_html_e('Classes', 'doneren-met-mollie');?></h3>
+            <table class="form-table">
+                <tbody>
+                <tr valign="top">
+                    <th scope="row" class="titledesc">
+                        <label><?php esc_html_e('Form class', 'doneren-met-mollie');?></label>
                     </th>
                     <td class="forminp">
                         <input type="text" size="50" name="dmm_form_cls" value="<?php echo esc_attr(get_option('dmm_form_cls'));?>">
@@ -623,7 +820,7 @@ class Dmm_Admin {
                 </tr>
                 <tr valign="top">
                     <th scope="row" class="titledesc">
-                        <label><?php esc_html_e('Form fields class', DMM_TXT_DOMAIN);?></label>
+                        <label><?php esc_html_e('Form fields class', 'doneren-met-mollie');?></label>
                     </th>
                     <td class="forminp">
                         <input type="text" size="50" name="dmm_fields_cls" value="<?php echo esc_attr(get_option('dmm_fields_cls'));?>">
@@ -631,7 +828,7 @@ class Dmm_Admin {
                 </tr>
                 <tr valign="top">
                     <th scope="row" class="titledesc">
-                        <label><?php esc_html_e('Form button class', DMM_TXT_DOMAIN);?></label>
+                        <label><?php esc_html_e('Form button class', 'doneren-met-mollie');?></label>
                     </th>
                     <td class="forminp">
                         <input type="text" size="50" name="dmm_button_cls" value="<?php echo esc_attr(get_option('dmm_button_cls'));?>">
@@ -639,7 +836,7 @@ class Dmm_Admin {
                 </tr>
                 <tr valign="top">
                     <th scope="row" class="titledesc">
-                        <label><?php esc_html_e('Message success class', DMM_TXT_DOMAIN);?></label>
+                        <label><?php esc_html_e('Message success class', 'doneren-met-mollie');?></label>
                     </th>
                     <td class="forminp">
                         <input type="text" size="50" name="dmm_success_cls" value="<?php echo esc_attr(get_option('dmm_success_cls'));?>">
@@ -647,7 +844,7 @@ class Dmm_Admin {
                 </tr>
                 <tr valign="top">
                     <th scope="row" class="titledesc">
-                        <label><?php esc_html_e('Message failure class', DMM_TXT_DOMAIN);?></label>
+                        <label><?php esc_html_e('Message failure class', 'doneren-met-mollie');?></label>
                     </th>
                     <td class="forminp">
                         <input type="text" size="50" name="dmm_failure_cls" value="<?php echo esc_attr(get_option('dmm_failure_cls'));?>">
@@ -665,20 +862,19 @@ class Dmm_Admin {
     {
         $recurring = false;
         try {
-            $mollie = new Mollie_API_Client;
-            if (get_option('dmm_mollie_apikey'))
-                $mollie->setApiKey(get_option('dmm_mollie_apikey'));
-            else
-            {
-                echo '<div class="error notice"><p>' . esc_html__('No API-key set', DMM_TXT_DOMAIN) . '</p></div>';
+            if (!get_option('dmm_mollie_apikey')) {
+                echo '<div class="error notice"><p>' . esc_html__('No API-key set', 'doneren-met-mollie') . '</p></div>';
                 return;
             }
 
-            if (count($mollie->methods->all(0,50, array('recurringType' => 'recurring'))))
-                $recurring = true;
+            $mollie = new MollieApi(get_option('dmm_mollie_apikey'));
 
-        } catch (Mollie_API_Exception $e) {
-            echo "<div class=\"error notice\"><p>API call failed: " . htmlspecialchars($e->getMessage()) . "</p></div>";
+            if (count($mollie->all('methods', array('sequenceType' => 'recurring')))) {
+                $recurring = true;
+            }
+
+        } catch (Exception $e) {
+            echo "<div class=\"error notice\"><p>Error: " . htmlspecialchars($e->getMessage()) . "</p></div>";
         }
         ?>
         <form method="post" action="options.php">
@@ -688,11 +884,11 @@ class Dmm_Admin {
                 <tbody>
                 <tr valign="top">
                     <th scope="row" class="titledesc">
-                        <label><?php esc_html_e('Activate recurring payments', DMM_TXT_DOMAIN);?></label>
+                        <label><?php esc_html_e('Activate recurring payments', 'doneren-met-mollie');?></label>
                     </th>
                     <td class="forminp">
                         <input type="checkbox" name="dmm_recurring" <?php echo get_option('dmm_recurring') ? 'checked' : '';?> value="1" <?php echo $recurring ? '' : 'disabled';?>><br>
-                        <small><?php esc_html_e('Creditcard or SEPA Direct Debit is necessary', DMM_TXT_DOMAIN);?></small>
+                        <small><?php esc_html_e('Creditcard or SEPA Direct Debit is necessary', 'doneren-met-mollie');?></small>
                     </td>
                 </tr>
 
@@ -702,7 +898,7 @@ class Dmm_Admin {
                     ?>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Name of the foundation', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Name of the foundation', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
                             <input type="text" size="50" name="dmm_name_foundation" value="<?php echo esc_attr(get_option('dmm_name_foundation'));?>">
@@ -710,12 +906,25 @@ class Dmm_Admin {
                     </tr>
                     <tr valign="top">
                         <th scope="row" class="titledesc">
-                            <label><?php esc_html_e('Possible intervals', DMM_TXT_DOMAIN);?></label>
+                            <label><?php esc_html_e('Possible intervals', 'doneren-met-mollie');?></label>
                         </th>
                         <td class="forminp">
-                            <label><input type="checkbox" name="dmm_recurring_interval[month]" <?php echo isset($intervals['month']) ? 'checked' : '';?> value="1"> <?php esc_html_e('Monthly', DMM_TXT_DOMAIN);?></label><br>
-                            <label><input type="checkbox" name="dmm_recurring_interval[quarter]" <?php echo isset($intervals['quarter']) ? 'checked' : '';?> value="1"> <?php esc_html_e('Each quarter', DMM_TXT_DOMAIN);?></label><br>
-                                <label><input type="checkbox" name="dmm_recurring_interval[year]" <?php echo isset($intervals['year']) ? 'checked' : '';?> value="1"> <?php esc_html_e('Annually', DMM_TXT_DOMAIN);?></label>
+                            <label><input type="checkbox" name="dmm_recurring_interval[month]" <?php echo isset($intervals['month']) ? 'checked' : '';?> value="1"> <?php esc_html_e('Monthly', 'doneren-met-mollie');?></label><br>
+                            <label><input type="checkbox" name="dmm_recurring_interval[quarter]" <?php echo isset($intervals['quarter']) ? 'checked' : '';?> value="1"> <?php esc_html_e('Each quarter', 'doneren-met-mollie');?></label><br>
+                                <label><input type="checkbox" name="dmm_recurring_interval[year]" <?php echo isset($intervals['year']) ? 'checked' : '';?> value="1"> <?php esc_html_e('Annually', 'doneren-met-mollie');?></label>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row" class="titledesc">
+                            <label><?php esc_html_e('Default interval', 'doneren-met-mollie');?></label>
+                        </th>
+                        <td class="forminp">
+                            <select name="dmm_default_interval">
+                                <option value="one"><?php esc_html_e('One-time donation', 'doneren-met-mollie');?></option>
+                                <option value="month" <?php echo get_option('dmm_default_interval') === 'month' ? 'selected' : '';?>><?php esc_html_e('Monthly', 'doneren-met-mollie');?></option>
+                                <option value="quarter" <?php echo get_option('dmm_default_interval') === 'quarter' ? 'selected' : '';?>><?php esc_html_e('Each quarter', 'doneren-met-mollie');?></option>
+                                <option value="year" <?php echo get_option('dmm_default_interval') === 'year' ? 'selected' : '';?>><?php esc_html_e('Annually', 'doneren-met-mollie');?></option>
+                            </select>
                         </td>
                     </tr>
                 <?php } ?>
@@ -738,11 +947,11 @@ class Dmm_Admin {
                 <tbody>
                 <tr valign="top">
                     <th scope="row" class="titledesc">
-                        <label><?php esc_html_e('API-key', DMM_TXT_DOMAIN);?></label>
+                        <label><?php esc_html_e('API-key', 'doneren-met-mollie');?></label>
                     </th>
                     <td class="forminp">
                         <input type="text" size="50" name="dmm_mollie_apikey" value="<?php echo esc_attr(get_option('dmm_mollie_apikey'));?>"><br>
-                        <small><?php esc_html_e('Starts with live_ or test_', DMM_TXT_DOMAIN);?></small>
+                        <small><?php esc_html_e('Starts with live_ or test_', 'doneren-met-mollie');?></small>
                     </td>
                 </tr>
                 </tbody>
@@ -755,7 +964,6 @@ class Dmm_Admin {
 
     public function get_page_id_by_slug($slug)
     {
-        $id = $this->wpdb->get_var("SELECT id FROM " . $this->wpdb->posts . " WHERE post_name = '" . esc_sql($slug) . "' AND post_type = 'page'");
-        return $id;
+        return $this->wpdb->get_var("SELECT id FROM " . $this->wpdb->posts . " WHERE post_name = '" . esc_sql(sanitize_title_for_query($slug)) . "' AND post_type = 'page'");
     }
 }

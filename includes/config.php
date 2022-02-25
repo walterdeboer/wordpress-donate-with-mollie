@@ -1,7 +1,7 @@
 <?php
 
 // General
-define('DMM_PLUGIN_ROLE', 'administrator');
+define('DMM_PLUGIN_ROLE', 'manage_options');
 define('DMM_WEBHOOK', '/dmm-webhook/');
 
 // Database

@@ -1,4 +1,7 @@
 <?php
+
+use DonerenMetMollie\MollieApi;
+
 class Dmm_Webhook {
 
     private $wpdb;
@@ -48,60 +51,79 @@ class Dmm_Webhook {
     /**
      * Sniff Requests
      * @param $query
+     * @return void if API request
      * @since 2.1.4
-     * @return die if API request
      */
     public function sniff_requests($query)
     {
-        if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($query->query_vars['__dmmapi']))
-        {
-            echo $this->handle_request($query);
-            exit;
+        if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($query->query_vars['__dmmapi'])) {
+            exit($this->handle_request($query));
         }
     }
 
     /**
      * Handle Webhook Request
      * @param $query
-     * @since 2.1.4
      * @return string
+     * @since 2.1.4
      */
     protected function handle_request($query)
     {
-        $dmm_webhook = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS']=='on'?'https://':'http://') . $_SERVER['HTTP_HOST'] . DMM_WEBHOOK;
+        $dmm_webhook = get_home_url(null, DMM_WEBHOOK);
+        $payment_id  = sanitize_text_field($_POST['id']);
+
+        if (empty($payment_id)) {
+            status_header(404);
+            return 'No payment id';
+        }
+
+        do_action('dmm_webhook_called', $payment_id);
 
         try {
             // Connect with Mollie
-            $mollie = new Mollie_API_Client;
-            if (get_option('dmm_mollie_apikey'))
-                $mollie->setApiKey(get_option('dmm_mollie_apikey'));
-            else
-            {
+            if (!get_option('dmm_mollie_apikey')) {
                 status_header(404);
                 return 'No API-key set';
             }
 
+            $mollie = new MollieApi(get_option('dmm_mollie_apikey'));
+
             if (!$query->query_vars['sub'])
             {
                 // First payment of recurring donation or one-time donation
-                $payment_id = $_POST['id'];
-                if (!$payment_id)
-                {
-                    status_header(404);
-                    return 'No payment id';
-                }
-
                 $donation = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_DONATIONS . " WHERE payment_id = '" . esc_sql($payment_id) . "'");
 
-                if (!$donation->id)
-                {
+                if (!$donation->id) {
                     status_header(404);
                     return 'Donation not found';
                 }
 
-                $payment = $mollie->payments->get($payment_id);
+                $payment = $mollie->get('payments/' . sanitize_text_field($payment_id));
+
+                $status = $payment->status;
+
+                if (!empty($payment->_links->refunds)) {
+                    $status = 'refunded';
+                }
+
+                if (!empty($payment->_links->chargebacks)) {
+                    $status = 'charged_back';
+                }
+
+                if ($status === 'paid') {
+                    do_action('dmm_payment_paid', $donation, $payment);
+                } elseif ($status === 'charged_back') {
+                    do_action('dmm_payment_chargedback', $donation, $payment);
+                } elseif ($status === 'refunded') {
+                    do_action('dmm_payment_refunded', $donation, $payment);
+                } elseif ($status === 'open' || $status === 'pending') {
+                    do_action('dmm_payment_open', $donation, $payment);
+                } else {
+                    do_action('dmm_payment_failed', $donation, $payment);
+                }
+
                 $this->wpdb->query($this->wpdb->prepare("UPDATE " . DMM_TABLE_DONATIONS . " SET dm_status = %s, payment_method = %s, payment_mode = %s, customer_id = %s WHERE id = %d",
-                    $payment->status,
+                    $status,
                     $payment->method,
                     $payment->mode,
                     $payment->customerId,
@@ -109,12 +131,11 @@ class Dmm_Webhook {
                 ));
 
 
-                if (($query->query_vars['first'] && $query->query_vars['secret']) && ($payment->isPaid() && !$payment->isRefunded()))
+                if (($query->query_vars['first'] && $query->query_vars['secret']) && $status == 'paid')
                 {
                     $customer = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_DONORS . " WHERE id = '" . esc_sql($query->query_vars['first']) . "' AND secret='" . esc_sql($query->query_vars['secret']) . "'");
 
-                    if (!$customer->id)
-                    {
+                    if (!$customer->id) {
                         status_header(404);
                         return 'Customer not found';
                     }
@@ -127,8 +148,12 @@ class Dmm_Webhook {
 
                     $sub_id = $this->wpdb->insert_id;
                     $interval = $this->dmm_get_interval($customer->sub_interval);
-                    $subscription = $mollie->customers_subscriptions->withParentId($customer->customer_id)->create(array(
-                        "amount"      => $customer->sub_amount,
+
+                    $subscription = $mollie->post('customers/' . sanitize_text_field($customer->customer_id) . '/subscriptions', array(
+                        "amount"        => array(
+                            "currency"  => $customer->sub_currency,
+                            "value"     => (string) number_format($customer->sub_amount, 2, '.', '')
+                        ),
                         "interval"    => $interval,
                         "description" => $customer->sub_description,
                         "webhookUrl"  => $dmm_webhook . 'sub/' . $sub_id,
@@ -140,10 +165,11 @@ class Dmm_Webhook {
                         $donation->id
                     ));
 
-                    $this->wpdb->query($this->wpdb->prepare("UPDATE " . DMM_TABLE_SUBSCRIPTIONS . " SET subscription_id = %s, sub_mode = %s, sub_amount = %s, sub_times = %s, sub_interval = %s, sub_description = %s, sub_method = %s, sub_status = %s WHERE id = %d",
+                    $this->wpdb->query($this->wpdb->prepare("UPDATE " . DMM_TABLE_SUBSCRIPTIONS . " SET subscription_id = %s, sub_mode = %s, sub_currency = %s, sub_amount = %s, sub_times = %s, sub_interval = %s, sub_description = %s, sub_method = %s, sub_status = %s WHERE id = %d",
                         $subscription->id,
                         $subscription->mode,
-                        $subscription->amount,
+                        $subscription->amount->currency,
+                        $subscription->amount->value,
                         $subscription->times,
                         $subscription->interval,
                         $subscription->description,
@@ -153,51 +179,42 @@ class Dmm_Webhook {
                     ));
                 }
 
-                return 'OK, ' . $payment_id;
-            }
-            else
-            {
+                return 'OK, ' . esc_html($payment_id);
+            } else {
                 // Subscription
                 $sub = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_SUBSCRIPTIONS . " WHERE id = '" . esc_sql($query->query_vars['sub']) . "'");
-                if (!$sub->id)
-                {
+                if (!$sub->id) {
                     status_header(404);
                     return 'Subscription not found';
                 }
 
 
                 $firstDonation = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_DONATIONS . " WHERE subscription_id = '" . esc_sql($sub->subscription_id) . "'");
-                if (!$firstDonation->id)
-                {
+                if (!$firstDonation->id) {
                     status_header(404);
                     return 'Donation not found';
                 }
 
-                $payment_id = $_POST['id'];
-                if (!$payment_id)
-                {
-                    status_header(404);
-                    return 'No payment id';
-                }
-
-
                 $donation_id = uniqid(rand(1,99));
-                $payment = $mollie->payments->get($payment_id);
+                $payment = $mollie->get('payments/' . sanitize_text_field($payment_id));
 
                 $donation = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_DONATIONS . " WHERE payment_id = '" . esc_sql($payment->id) . "'");
                 if (!$donation->id)
                 {
                     // New payment
                     $this->wpdb->query($this->wpdb->prepare("INSERT INTO " . DMM_TABLE_DONATIONS . "
-                    ( `time`, payment_id, customer_id, subscription_id, donation_id, dm_status, dm_amount, dm_name, dm_email, dm_project, dm_company, dm_address, dm_zipcode, dm_city, dm_country, dm_message, dm_phone, payment_method, payment_mode )
-                    VALUES ( %s, %s, %s, %s, %s, %s, %f, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s )",
+                    ( `time`, payment_id, customer_id, subscription_id, donation_id, dm_status, dm_currency, dm_amount, dm_settlement_currency, dm_settlement_amount, dm_name, dm_email, dm_project, dm_company, dm_address, dm_zipcode, dm_city, dm_country, dm_message, dm_phone, payment_method, payment_mode )
+                    VALUES ( %s, %s, %s, %s, %s, %s, %s, %f, %s, %f, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s )",
                         date('Y-m-d H:i:s'),
                         $payment->id,
                         $payment->customerId,
                         $payment->subscriptionId,
                         $donation_id,
                         $payment->status,
-                        $payment->amount,
+                        $payment->amount->currency,
+                        $payment->amount->value,
+                        $payment->settlementAmount->currency,
+                        $payment->settlementAmount->value,
                         $firstDonation->dm_name,
                         $firstDonation->dm_email,
                         $firstDonation->dm_project,
@@ -211,9 +228,7 @@ class Dmm_Webhook {
                         $payment->method,
                         $payment->mode
                     ));
-                }
-                else
-                {
+                } else {
                     // Update payment
                     $this->wpdb->query($this->wpdb->prepare("UPDATE " . DMM_TABLE_DONATIONS . " SET dm_status = %s, payment_method = %s, payment_mode = %s WHERE payment_id = %s",
                         $payment->status,
@@ -223,10 +238,10 @@ class Dmm_Webhook {
                     ));
                 }
 
-                return 'OK, ' . $payment_id;
+                return 'OK, ' . esc_html($payment_id);
             }
 
-        } catch (Mollie_API_Exception $e) {
+        } catch (Exception $e) {
             status_header(404);
             return"API call failed: " . $e->getMessage();
         }
@@ -242,6 +257,7 @@ class Dmm_Webhook {
     private function dmm_get_interval($string)
     {
         switch ($string) {
+            default:
             case 'month':
                 $interval = '1 month';
                 break;

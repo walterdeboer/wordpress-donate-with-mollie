@@ -1,12 +1,11 @@
 <?php
 /*
 Plugin Name: Doneren met Mollie
-Description: Donaties ontvangen via Mollie
-Version: 2.2.0
-Author: Nick Dijkstra
-Author URI: http://nickdijkstra.nl
+Description: Receive donations via Mollie
+Version: 2.9.3
+Author: Wobbie.nl
+Author URI: https://wobbie.nl
 Text Domain: doneren-met-mollie
-Domain Path: /languages/
 */
 
 if (!defined('ABSPATH')) {
@@ -15,7 +14,7 @@ if (!defined('ABSPATH')) {
 
 // Plugin Version
 if (!defined('DMM_VERSION')) {
-    define('DMM_VERSION', '2.2.0');
+    define('DMM_VERSION', '2.9.3');
 }
 
 // Plugin Folder Path
@@ -29,11 +28,10 @@ global $wpdb;
 
 // Includes
 require_once DMM_PLUGIN_PATH . 'includes/config.php';
+require_once DMM_PLUGIN_PATH . 'includes/functions.php';
+require_once DMM_PLUGIN_PATH . 'includes/mollie-api.php';
 require_once DMM_PLUGIN_PATH . 'includes/class-webhook.php';
 require_once DMM_PLUGIN_PATH . 'includes/class-start.php';
-
-if(!class_exists('Mollie_API_Client'))
-    require_once DMM_PLUGIN_PATH . 'libs/mollie-api-php/src/Mollie/API/Autoloader.php';
 
 $dmm_webook = new Dmm_Webhook();
 $dmm = new Dmm_Start();
@@ -57,19 +55,11 @@ register_uninstall_hook(__FILE__, 'dmm_uninstall_database');
 
 function dmm_uninstall_database()
 {
-    global $wpdb;
-    $table_name = DMM_TABLE_DONATIONS;
-    $table_name1 = DMM_TABLE_DONORS;
-    $table_name2 = DMM_TABLE_SUBSCRIPTIONS;
-
     delete_option('dmm_plugin_version');
-
-    $wpdb->query("DROP TABLE IF EXISTS $table_name");
-    $wpdb->query("DROP TABLE IF EXISTS $table_name1");
-    $wpdb->query("DROP TABLE IF EXISTS $table_name2");
 }
 
-function dmm_load_locale() {
-    load_plugin_textdomain(DMM_TXT_DOMAIN, false, dirname(plugin_basename(__FILE__)) . '/languages/');
-}
-add_action('plugins_loaded', 'dmm_load_locale');
+// Update database when plugin is updated
+if (get_option('dmm_version') != DMM_VERSION)
+    $dmm->dmm_install_database();
+
+load_plugin_textdomain('doneren-met-mollie');
