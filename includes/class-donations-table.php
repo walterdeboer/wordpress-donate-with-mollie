@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * Toont de lijst met donaties
+ */
 class Dmm_List_Table extends WP_List_Table
 {
     public function __construct() {

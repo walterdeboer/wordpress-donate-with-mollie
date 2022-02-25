@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * Toont de lijst met opgeslagen subscriptions in de backend,
+ * dwz de subscriptions die in wordpress zijn opgeslagen,
+ * niet alle die in mollie bekend zijn
+ */
 class Dmm_Subscriptions_Table extends WP_List_Table
 {
     function get_columns()

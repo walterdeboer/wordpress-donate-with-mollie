@@ -2,6 +2,9 @@
 
 use DonerenMetMollie\MollieApi;
 
+/**
+ * Admin pagina
+ */
 class Dmm_Admin {
 
     private $wpdb;
@@ -19,8 +22,9 @@ class Dmm_Admin {
         add_action('admin_post_dmm_export', array($this, 'dmm_export_donations'));
         add_filter('plugin_row_meta', array($this, 'plugin_row_meta'), 10, 2);
 
-        if (!get_option('permalink_structure'))
+        if (!get_option('permalink_structure')) {
             add_action('admin_notices', array($this, 'dmm_admin_notice__warning'));
+        }
     }
 
     /**

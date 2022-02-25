@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Geeft een lijst met valuta symbolen plus het aantal decimalen
+ * waaruit een bedrag kan bestaan
+ */
 function dmm_get_currencies($currency = null)
 {
     $currencies = [
@@ -36,6 +40,9 @@ function dmm_get_currencies($currency = null)
     return $currencies;
 }
 
+/**
+ * Zet bekende valuta symbolen om naar de juiste HTML entity
+ */
 function dmm_get_currency_symbol($currency = 'EUR')
 {
     switch ($currency)

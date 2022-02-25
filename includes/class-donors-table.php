@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * Toont de lijst met donateurs in de backend
+ */
 class Dmm_Donors_Table extends WP_List_Table
 {
     public function __construct() {

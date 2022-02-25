@@ -2,6 +2,9 @@
 
 use DonerenMetMollie\MollieApi;
 
+/**
+ * Webhook die aangeroepen wordt nadat een betaling is gedaan
+ */
 class Dmm_Webhook {
 
     private $wpdb;
