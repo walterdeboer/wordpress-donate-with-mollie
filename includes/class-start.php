@@ -343,11 +343,11 @@ class Dmm_Start
                 $errors = apply_filters('dmm_donate_form_validation', $errors);
 
                 if (!empty($errors)) {
-                    echo '<ul>';
+                    echo '<ul id="dmm-errors" class="dmm-errors">';
                     foreach ($errors as $error) {
-                        echo '<li style="color: red;">' . $error . '</li>';
+                        echo '<li>' . $error . '</li>';
                     }
-                    echo '</ul><br>';
+                    echo '</ul>';
                 } else {
                     $donation_id = uniqid(rand(1, 99));
                     $amount      = number_format(str_replace(',', '.', sanitize_text_field($_POST['dmm_amount'])), 2, '.', '');
@@ -564,8 +564,56 @@ class Dmm_Start
                 $selected_interval = isset($_POST['dmm_recurring_interval']) ?
                         sanitize_text_field($_POST['dmm_recurring_interval']) : get_option('dmm_default_interval');
                 ?>
+                <script>
+                function dmmClearErrors() {
+                  var ulErrors = document.querySelector('ul#dmm-errors');
+                  if (ulErrors) {
+                    ulErrors.innerHTML = '';
+                  }
+                }
+                function addError(msg) {
+                  var ulErrors = document.querySelector('ul#dmm-errors');
+                  if (!ulErrors) {
+                    ulErrors = document.createElement("ul");
+                    ulErrors.id='dmm-errors';
+                    ulErrors.classList.add('dmm-errors');
+                    form = document.querySelector('form.dmm-form');
+                    form.parentNode.insertBefore(ulErrors, form);
+                  }
+                  liError = document.createElement("li");
+                  liError.innerHTML = msg;
+                  ulErrors.appendChild(liError);
+                }
+                function dmmFormValid(form) {
+                  dmmClearErrors();
+                  var result = true;
+                  var amountFreeRadio = document.querySelector('#dmm_amount_free');
+                  if (amountFreeRadio && amountFreeRadio.checked) {
+                    var amountInput = document.querySelector('#dmm_amount');
+                    if (amountInput.value && !isNaN(amountInput.value)) {
+                      result &= true;
+                    } else {
+                      addError('<?php echo __('Please choose an amount', 'doneren-met-mollie'); ?>');
+                      // addError('<?php echo __('The amount is too low, please choose a higher amount', 'doneren-met-mollie'); ?>');
+                    }
+                  }
+                  var permissionLabel = document.querySelector('#dmm_permission');
+                  if (permissionLabel && (permissionLabel.style.display != 'none')) {
+                    var checkbox = permissionLabel.querySelector('input');
+                    if (checkbox.checked) {
+                      result &= true;
+                    } else {
+                      addError('<?php echo __('Please give authorization to collect from your account', 'doneren-met-mollie'); ?>');
+                    }
+                  }
+                  // TODO GDPR
+                  // addError('<?php echo __('Please agree to our Privacy Policy', 'doneren-met-mollie'); ?>');
+                  return result;
+                }
+                </script>
                 <form action="<?php echo esc_attr($_SERVER['REQUEST_URI']); ?>"
                       class="dmm-form <?php echo esc_attr(get_option('dmm_form_cls')); ?>"
+                      onsubmit="return dmmFormValid(this);"
                       method="post">
 
                     <?php
@@ -618,11 +666,12 @@ class Dmm_Start
                             <label for="dmm_name"><?php echo esc_html__('Name', 'doneren-met-mollie') .
                                                              (isset($dmm_fields['Name']['required']) &&
                                                               $dmm_fields['Name']['required'] ?
-                                                                     '<span style="color:red;">*</span>' :
+                                                                     '<span class="danger">*</span>' :
                                                                      ''); ?></label>
                             <input type="text"
                                    id="dmm_name"
                                    name="dmm_name"
+                                   <?php echo ($dmm_fields['Name']['required'] ? 'required': ''); ?>
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_name"]) ? esc_attr($_POST["dmm_name"]) : ''); ?>"
                                    >
@@ -635,11 +684,12 @@ class Dmm_Start
                             <label for="dmm_company"><?php echo esc_html__('Company name', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Company name']['required']) &&
                                                                  $dmm_fields['Company name']['required'] ?
-                                                                        '<span style="color:red;">*</span>' :
+                                                                        '<span class="danger">*</span>' :
                                                                         ''); ?></label>
                             <input type="text"
                                    id="dmm_company"
                                    name="dmm_company"
+                                   <?php echo ($dmm_fields['Company name']['required'] ? 'required': ''); ?>
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_company"]) ? esc_attr($_POST["dmm_company"]) :
                                            ''); ?>"
@@ -653,11 +703,12 @@ class Dmm_Start
                             <label for="dmm_email"><?php echo esc_html__('Email address', 'doneren-met-mollie') .
                                                               (isset($dmm_fields['Email address']['required']) &&
                                                                $dmm_fields['Email address']['required'] ?
-                                                                      '<span style="color:red;">*</span>' :
+                                                                      '<span class="danger">*</span>' :
                                                                       ''); ?></label>
                             <input type="email"
                                    id="dmm_email"
                                    name="dmm_email"
+                                   <?php echo ($dmm_fields['Email address']['required'] ? 'required': ''); ?>
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_email"]) ? esc_attr($_POST["dmm_email"]) :
                                            ''); ?>"
@@ -671,7 +722,7 @@ class Dmm_Start
                             <label for="dmm_phone"><?php echo esc_html__('Phone number', 'doneren-met-mollie') .
                                                               (isset($dmm_fields['Phone number']['required']) &&
                                                                $dmm_fields['Phone number']['required'] ?
-                                                                      '<span style="color:red;">*</span>' :
+                                                                      '<span class="danger">*</span>' :
                                                                       ''); ?></label>
                             <input type="text"
                                    id="dmm_phone"
@@ -688,11 +739,12 @@ class Dmm_Start
                             <label for="dmm_address"><?php echo esc_html__('Street', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Address']['required']) &&
                                                                  $dmm_fields['Address']['required'] ?
-                                                                        '<span style="color:red;">*</span>' :
+                                                                        '<span class="danger">*</span>' :
                                                                         ''); ?></label>
                             <input type="text"
                                    id="dmm_address"
                                    name="dmm_address"
+                                   <?php echo ($dmm_fields['Address']['required'] ? 'required': ''); ?>
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_address"]) ? esc_attr($_POST["dmm_address"]) :
                                            ''); ?>"
@@ -702,11 +754,12 @@ class Dmm_Start
                             <label for="dmm_zipcode"><?php echo esc_html__('Zipcode', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Address']['required']) &&
                                                                  $dmm_fields['Address']['required'] ?
-                                                                        '<span style="color:red;">*</span>' :
+                                                                        '<span class="danger">*</span>' :
                                                                         ''); ?></label>
                             <input type="text"
                                    id="dmm_zipcode"
                                    name="dmm_zipcode"
+                                   <?php echo ($dmm_fields['Address']['required'] ? 'required': ''); ?>
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_zipcode"]) ? esc_attr($_POST["dmm_zipcode"]) :
                                            ''); ?>"
@@ -716,11 +769,12 @@ class Dmm_Start
                             <label for="dmm_city"><?php echo esc_html__('City', 'doneren-met-mollie') .
                                                              (isset($dmm_fields['Address']['required']) &&
                                                               $dmm_fields['Address']['required'] ?
-                                                                     '<span style="color:red;">*</span>' :
+                                                                     '<span class="danger">*</span>' :
                                                                      ''); ?></label>
                             <input type="text"
                                    id="dmm_city"
                                    name="dmm_city"
+                                   <?php echo ($dmm_fields['Address']['required'] ? 'required': ''); ?>
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_city"]) ? esc_attr($_POST["dmm_city"]) : ''); ?>"
                                    >
@@ -729,11 +783,12 @@ class Dmm_Start
                             <label for="dmm_country"><?php echo esc_html__('Country', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Address']['required']) &&
                                                                  $dmm_fields['Address']['required'] ?
-                                                                        '<span style="color:red;">*</span>' :
+                                                                        '<span class="danger">*</span>' :
                                                                         ''); ?></label>
                             <input type="text"
                                    id="dmm_country"
                                    name="dmm_country"
+                                   <?php echo ($dmm_fields['Address']['required'] ? 'required': ''); ?>
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_country"]) ? esc_attr($_POST["dmm_country"]) :
                                            ''); ?>"
@@ -746,7 +801,7 @@ class Dmm_Start
                             <label for="dmm_project"><?php echo esc_html__('Project', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Project']['required']) &&
                                                                  $dmm_fields['Project']['required'] ?
-                                                                        '<span style="color:red;">*</span>' :
+                                                                        '<span class="danger">*</span>' :
                                                                         ''); ?></label>
                             <?php echo $this->dmm_projects(isset($_POST["dmm_project"]) ?
                                     sanitize_text_field($_POST["dmm_project"]) : ''); ?>
@@ -758,12 +813,13 @@ class Dmm_Start
                             <label for="dmm_message"><?php echo esc_html__('Message', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Message']['required']) &&
                                                                  $dmm_fields['Message']['required'] ?
-                                                                        '<span style="color:red;">*</span>' :
+                                                                        '<span class="danger">*</span>' :
                                                                         ''); ?></label>
                             <textarea id="dmm_message"
                                       name="dmm_message"
                                       class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                       rows="5"
+                                      <?php echo ($dmm_fields['Message']['required'] ? 'required': ''); ?>
                                       ><?php echo(isset($_POST["dmm_message"]) ?
                                         esc_attr($_POST["dmm_message"]) : ''); ?></textarea>
                         </p>
@@ -772,7 +828,7 @@ class Dmm_Start
                     <?php
                     if (get_option('dmm_currency_switch') == '1') {
                         echo '<label for="dmm_currency">' . esc_html_e('Currency', 'doneren-met-mollie') .
-                             '<span style="color:red;">*</span></label>';
+                             '<span class="danger">*</span></label>';
 
                         echo '<select name="dmm_currency" class="' . esc_attr(get_option('dmm_fields_cls')) .
                              '" id="dmm_currency" onchange="dmm_multicurrency_methods(this.value);" style="width: 100%;">';
@@ -795,7 +851,7 @@ class Dmm_Start
                     <?php
                     echo '<p><label>' .
                          esc_html__('Amount', 'doneren-met-mollie') .
-                         ' (<span id="dmm_currency_symbol"></span>) <span style="color:red;">*</span>' .
+                         ' (<span id="dmm_currency_symbol"></span>) <span class="danger">*</span>' .
                          '</label></p>';
 
                     if (get_option('dmm_amount')) {
@@ -1072,8 +1128,10 @@ class Dmm_Start
     {
         $projects = explode(PHP_EOL, sanitize_textarea_field(get_option('dmm_projects')));
 
-        $projectList = '<select  id="dmm_project" name="dmm_project" class="' .
-                       esc_attr(get_option('dmm_fields_cls')) . '">';
+        $projectList = '<select  id="dmm_project" name="dmm_project"'.
+                       ' class="' . esc_attr(get_option('dmm_fields_cls')) . '"' .
+                       ($dmm_fields['Project']['required'] ? ' required': '') .
+                       '>';
         foreach ($projects as $project) {
             $projectList .= '<option' . ($selected === $project ? ' selected' : '') . '>' . esc_attr($project) .
                             '</option>';

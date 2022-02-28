@@ -2,6 +2,12 @@
   background-color: inherit;
 }
 
+.dmm-form span.danger,
+ul.dmm-errors li {
+  color: #cc3333;
+}
+
+.ul.dmm-errors,
 .dmm-form .dmm-recurring-container {
   margin: 0 0 2rem 0;
   text-align: center;
