@@ -1,0 +1,62 @@
+.dmm-form {
+  background-color: inherit;
+}
+
+.dmm-form .dmm-recurring-container {
+  margin: 0 0 2rem 0;
+  text-align: center;
+}
+
+.dmm-form .dmm-button-container {
+  margin: 2rem 0 0 0;
+  text-align: center;
+}
+
+.dmm-form .dmm-amount-container,
+.dmm-form .dmm-methods-container {
+  margin: 2rem 0;
+}
+
+
+.dmm-form p,
+.dmm-form label {
+	margin-top: 4px;
+}
+
+.dmm-form input[type="text"],
+.dmm-form input[type="number"],
+.dmm-form input[type="email"] {
+	margin: 5px 0 0;
+	padding: 15px;
+	border: 1px solid #333333;
+	color: #333333;
+	border-radius: 0;
+	outline: 0;
+	font-size: 13px;
+	line-height: 17px;
+	background-color: #fff;
+	font-family: Raleway;
+	font-weight: 400;
+	-webkit-box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	box-sizing: border-box;
+  width:  100%;
+}
+
+.dmm-form input[type="radio"].dmm-radio-button {
+  display: none;
+}
+
+.dmm-form input[type="radio"].dmm-radio-button + label {
+  border: 1px solid #999;
+  padding: 2px 8px 4px 8px;
+  display: inline-block;
+  border-radius: 8px;
+  margin-right: 0.75rem;
+  cursor: pointer;
+}
+
+.dmm-form input[type="radio"].dmm-radio-button:checked + label {
+  background-color: #bbcc99;
+  color: white
+}

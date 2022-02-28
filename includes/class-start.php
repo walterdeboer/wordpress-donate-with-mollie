@@ -20,6 +20,7 @@ class Dmm_Start
         add_shortcode('doneren_met_mollie_total', [$this, 'dmm_donate_total']);
         add_shortcode('doneren_met_mollie_donors', [$this, 'dmm_donate_donors']);
         add_shortcode('doneren_met_mollie_goal', [$this, 'dmm_donate_goal']);
+        add_action('wp_enqueue_scripts', [$this, 'dmm_enqueue_style']);
 
         // Variable translations
         __('iDEAL', 'doneren-met-mollie');
@@ -142,6 +143,12 @@ class Dmm_Start
                          '</a>';
         array_unshift($links, $settings_link);
         return $links;
+    }
+
+
+    function dmm_enqueue_style()
+    {
+        wp_enqueue_style( 'dmm-styles', plugins_url('/css/dmm-style.css', dirname(__FILE__)), false, '1.0.0', 'all');
     }
 
     /**
@@ -520,8 +527,8 @@ class Dmm_Start
 
             }
 
-            // Return page
             if (isset($_GET['dmm_id'])) {
+                // Return page
                 $donation = $this->wpdb->get_row("SELECT * FROM " . DMM_TABLE_DONATIONS . " WHERE donation_id = '" .
                                                  esc_sql($_GET['dmm_id']) . "'");
                 $payment  = $mollie->get('payments/' . $donation->payment_id);
@@ -552,14 +559,13 @@ class Dmm_Start
                 }
             } else {
                 // Donation form
-
                 $intervals = get_option('dmm_recurring_interval');
 
                 $selected_interval = isset($_POST['dmm_recurring_interval']) ?
                         sanitize_text_field($_POST['dmm_recurring_interval']) : get_option('dmm_default_interval');
                 ?>
                 <form action="<?php echo esc_attr($_SERVER['REQUEST_URI']); ?>"
-                      class="<?php echo esc_attr(get_option('dmm_form_cls')); ?>"
+                      class="dmm-form <?php echo esc_attr(get_option('dmm_form_cls')); ?>"
                       method="post">
 
                     <?php
@@ -567,34 +573,49 @@ class Dmm_Start
                     do_action('dmm_donate_form_top'); ?>
 
                     <?php if (get_option('dmm_recurring')) { ?>
-                        <p>
-                            <select id="dmm_interval"
-                                    name="dmm_recurring_interval"
-                                    style="width: 100%"
-                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
-                                    onchange="dmm_recurring_methods(this.value);">
-                                <option value="one"><?php echo esc_html_e('One-time donation', 'doneren-met-mollie'); ?></option>
-                                <?php if (isset($intervals['month'])) { ?>
-                                    <option value="month" <?php echo($selected_interval === 'month' ? 'selected' :
-                                            ''); ?>><?php echo esc_html_e('Monthly', 'doneren-met-mollie'); ?></option>
-                                <?php } ?>
-                                <?php if (isset($intervals['quarter'])) { ?>
-                                    <option value="quarter" <?php echo($selected_interval === 'quarter' ? 'selected' :
-                                            ''); ?>><?php echo esc_html_e('Each quarter', 'doneren-met-mollie'); ?></option>
-                                <?php } ?>
-                                <?php if (isset($intervals['year'])) { ?>
-                                    <option value="year" <?php echo($selected_interval === 'year' ? 'selected' :
-                                            ''); ?>><?php echo esc_html_e('Annually', 'doneren-met-mollie'); ?></option>
-                                <?php } ?>
-                            </select>
-                        </p>
+                        <div class="dmm-recurring-container">
+                            <input type="radio" id="dmm_interval_one"
+                                   name="dmm_recurring_interval"
+                                   value="one"
+                                   class="<?php echo 'dmm-radio-button ' . esc_attr(get_option('dmm_fields_cls')); ?>"
+                                   <?php echo($selected_interval === 'one' ? 'checked' : ''); ?>
+                                   onchange="dmm_toggle_recurring_methods(true);">
+                            <label for="dmm_interval_one"><?php echo esc_html__('One-time donation', 'doneren-met-mollie'); ?></label>
+                            <?php if (isset($intervals['month'])) { ?>
+                                <input type="radio" id="dmm_interval_month"
+                                       name="dmm_recurring_interval"
+                                       value="month"
+                                       class="<?php echo 'dmm-radio-button ' . esc_attr(get_option('dmm_fields_cls')); ?>"
+                                       <?php echo($selected_interval === 'month' ? 'checked' : ''); ?>
+                                       onchange="dmm_toggle_recurring_methods(false);">
+                                <label for="dmm_interval_month"><?php echo esc_html__('Monthly', 'doneren-met-mollie'); ?></label>
+                            <?php } ?>
+                            <?php if (isset($intervals['quarter'])) { ?>
+                                <input type="radio" id="dmm_interval_quarter"
+                                       name="dmm_recurring_interval"
+                                       value="quarter"
+                                       class="<?php echo 'dmm-radio-button ' . esc_attr(get_option('dmm_fields_cls')); ?>"
+                                       <?php echo($selected_interval === 'quarter' ? 'selected' : ''); ?>
+                                       onchange="dmm_toggle_recurring_methods(false);">
+                                <label for="dmm_interval_quarter"><?php echo esc_html__('Each quarter', 'doneren-met-mollie'); ?></label>
+                            <?php } ?>
+                            <?php if (isset($intervals['year'])) { ?>
+                                <input type="radio" id="dmm_interval_year"
+                                       name="dmm_recurring_interval"
+                                       value="year"
+                                       class="<?php echo 'dmm-radio-button ' . esc_attr(get_option('dmm_fields_cls')); ?>"
+                                       <?php echo($selected_interval === 'year' ? 'selected' : ''); ?>
+                                       onchange="dmm_toggle_recurring_methods(false);">
+                                <label for="dmm_interval_year"><?php echo esc_html__('Annually', 'doneren-met-mollie'); ?></label>
+                            <?php } ?>
+                        </div>
                     <?php } else { ?>
                         <input type="hidden" name="dmm_recurring_interval" value="one">
                     <?php } ?>
 
                     <?php if (isset($dmm_fields['Name']['active']) && $dmm_fields['Name']['active']) { ?>
                         <p>
-                            <label for="dmm_name"><?php echo esc_html_e('Name', 'doneren-met-mollie') .
+                            <label for="dmm_name"><?php echo esc_html__('Name', 'doneren-met-mollie') .
                                                              (isset($dmm_fields['Name']['required']) &&
                                                               $dmm_fields['Name']['required'] ?
                                                                      '<span style="color:red;">*</span>' :
@@ -604,14 +625,14 @@ class Dmm_Start
                                    name="dmm_name"
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_name"]) ? esc_attr($_POST["dmm_name"]) : ''); ?>"
-                                   style="width: 100%">
+                                   >
                         </p>
                     <?php } ?>
 
                     <?php if (isset($dmm_fields['Company name']['active']) &&
                               $dmm_fields['Company name']['active']) { ?>
                         <p>
-                            <label for="dmm_company"><?php echo esc_html_e('Company name', 'doneren-met-mollie') .
+                            <label for="dmm_company"><?php echo esc_html__('Company name', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Company name']['required']) &&
                                                                  $dmm_fields['Company name']['required'] ?
                                                                         '<span style="color:red;">*</span>' :
@@ -622,14 +643,14 @@ class Dmm_Start
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_company"]) ? esc_attr($_POST["dmm_company"]) :
                                            ''); ?>"
-                                   style="width: 100%">
+                                   >
                         </p>
                     <?php } ?>
 
                     <?php if (isset($dmm_fields['Email address']['active']) &&
                               $dmm_fields['Email address']['active']) { ?>
                         <p>
-                            <label for="dmm_email"><?php echo esc_html_e('Email address', 'doneren-met-mollie') .
+                            <label for="dmm_email"><?php echo esc_html__('Email address', 'doneren-met-mollie') .
                                                               (isset($dmm_fields['Email address']['required']) &&
                                                                $dmm_fields['Email address']['required'] ?
                                                                       '<span style="color:red;">*</span>' :
@@ -640,14 +661,14 @@ class Dmm_Start
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_email"]) ? esc_attr($_POST["dmm_email"]) :
                                            ''); ?>"
-                                   style="width: 100%">
+                                   >
                         </p>
                     <?php } ?>
 
                     <?php if (isset($dmm_fields['Phone number']['active']) &&
                               $dmm_fields['Phone number']['active']) { ?>
                         <p>
-                            <label for="dmm_phone"><?php echo esc_html_e('Phone number', 'doneren-met-mollie') .
+                            <label for="dmm_phone"><?php echo esc_html__('Phone number', 'doneren-met-mollie') .
                                                               (isset($dmm_fields['Phone number']['required']) &&
                                                                $dmm_fields['Phone number']['required'] ?
                                                                       '<span style="color:red;">*</span>' :
@@ -658,13 +679,13 @@ class Dmm_Start
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_phone"]) ? esc_attr($_POST["dmm_phone"]) :
                                            ''); ?>"
-                                   style="width: 100%">
+                                   >
                         </p>
                     <?php } ?>
 
                     <?php if (isset($dmm_fields['Address']['active']) && $dmm_fields['Address']['active']) { ?>
                         <p>
-                            <label for="dmm_address"><?php echo esc_html_e('Street', 'doneren-met-mollie') .
+                            <label for="dmm_address"><?php echo esc_html__('Street', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Address']['required']) &&
                                                                  $dmm_fields['Address']['required'] ?
                                                                         '<span style="color:red;">*</span>' :
@@ -675,10 +696,10 @@ class Dmm_Start
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_address"]) ? esc_attr($_POST["dmm_address"]) :
                                            ''); ?>"
-                                   style="width: 100%">
+                                   >
                         </p>
                         <p>
-                            <label for="dmm_zipcode"><?php echo esc_html_e('Zipcode', 'doneren-met-mollie') .
+                            <label for="dmm_zipcode"><?php echo esc_html__('Zipcode', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Address']['required']) &&
                                                                  $dmm_fields['Address']['required'] ?
                                                                         '<span style="color:red;">*</span>' :
@@ -689,10 +710,10 @@ class Dmm_Start
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_zipcode"]) ? esc_attr($_POST["dmm_zipcode"]) :
                                            ''); ?>"
-                                   style="width: 100%">
+                                   >
                         </p>
                         <p>
-                            <label for="dmm_city"><?php echo esc_html_e('City', 'doneren-met-mollie') .
+                            <label for="dmm_city"><?php echo esc_html__('City', 'doneren-met-mollie') .
                                                              (isset($dmm_fields['Address']['required']) &&
                                                               $dmm_fields['Address']['required'] ?
                                                                      '<span style="color:red;">*</span>' :
@@ -702,10 +723,10 @@ class Dmm_Start
                                    name="dmm_city"
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_city"]) ? esc_attr($_POST["dmm_city"]) : ''); ?>"
-                                   style="width: 100%">
+                                   >
                         </p>
                         <p>
-                            <label for="dmm_country"><?php echo esc_html_e('Country', 'doneren-met-mollie') .
+                            <label for="dmm_country"><?php echo esc_html__('Country', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Address']['required']) &&
                                                                  $dmm_fields['Address']['required'] ?
                                                                         '<span style="color:red;">*</span>' :
@@ -716,13 +737,13 @@ class Dmm_Start
                                    class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                    value="<?php echo(isset($_POST["dmm_country"]) ? esc_attr($_POST["dmm_country"]) :
                                            ''); ?>"
-                                   style="width: 100%">
+                                   >
                         </p>
                     <?php } ?>
 
                     <?php if (isset($dmm_fields['Project']['active']) && $dmm_fields['Project']['active']) { ?>
                         <p>
-                            <label for="dmm_project"><?php echo esc_html_e('Project', 'doneren-met-mollie') .
+                            <label for="dmm_project"><?php echo esc_html__('Project', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Project']['required']) &&
                                                                  $dmm_fields['Project']['required'] ?
                                                                         '<span style="color:red;">*</span>' :
@@ -734,7 +755,7 @@ class Dmm_Start
 
                     <?php if (isset($dmm_fields['Message']['active']) && $dmm_fields['Message']['active']) { ?>
                         <p>
-                            <label for="dmm_message"><?php echo esc_html_e('Message', 'doneren-met-mollie') .
+                            <label for="dmm_message"><?php echo esc_html__('Message', 'doneren-met-mollie') .
                                                                 (isset($dmm_fields['Message']['required']) &&
                                                                  $dmm_fields['Message']['required'] ?
                                                                         '<span style="color:red;">*</span>' :
@@ -743,118 +764,137 @@ class Dmm_Start
                                       name="dmm_message"
                                       class="<?php echo esc_attr(get_option('dmm_fields_cls')); ?>"
                                       rows="5"
-                                      style="width: 100%"><?php echo(isset($_POST["dmm_message"]) ?
+                                      ><?php echo(isset($_POST["dmm_message"]) ?
                                         esc_attr($_POST["dmm_message"]) : ''); ?></textarea>
                         </p>
                     <?php } ?>
 
-                    <p>
-                        <?php
-                        if (get_option('dmm_currency_switch') == '1') {
-                            echo '<label for="dmm_currency">' . esc_html_e('Currency', 'doneren-met-mollie') .
-                                 '<span style="color:red;">*</span></label>';
+                    <?php
+                    if (get_option('dmm_currency_switch') == '1') {
+                        echo '<label for="dmm_currency">' . esc_html_e('Currency', 'doneren-met-mollie') .
+                             '<span style="color:red;">*</span></label>';
 
-                            echo '<select name="dmm_currency" class="' . esc_attr(get_option('dmm_fields_cls')) .
-                                 '" id="dmm_currency" onchange="dmm_multicurrency_methods(this.value);" style="width: 100%;">';
+                        echo '<select name="dmm_currency" class="' . esc_attr(get_option('dmm_fields_cls')) .
+                             '" id="dmm_currency" onchange="dmm_multicurrency_methods(this.value);" style="width: 100%;">';
 
-                            foreach (dmm_get_currencies() as $currency => $decimals) {
-                                $symbol = dmm_get_currency_symbol($currency);
-                                echo '<option ' . (get_option('dmm_currency') === $currency ? 'selected' : '') .
-                                     ' value="' . esc_html($currency) . '">' . esc_html($currency) .
-                                     ($symbol != $currency ? ' (' . esc_html($symbol) . ')' : '') . '</option>';
-                            }
-
-                            echo '</select>';
-                        } else {
-                            echo '<input type="hidden" name="dmm_currency" id="dmm_currency" value="' .
-                                 esc_attr(get_option('dmm_currency', 'EUR')) . '">';
+                        foreach (dmm_get_currencies() as $currency => $decimals) {
+                            $symbol = dmm_get_currency_symbol($currency);
+                            echo '<option ' . (get_option('dmm_currency') === $currency ? 'selected' : '') .
+                                 ' value="' . esc_html($currency) . '">' . esc_html($currency) .
+                                 ($symbol != $currency ? ' (' . esc_html($symbol) . ')' : '') . '</option>';
                         }
 
-                        echo '<label for="dmm_amount">' . esc_html_e('Amount', 'doneren-met-mollie') .
-                             ' (<span id="dmm_currency_symbol"></span>) <span style="color:red;">*</span></label>';
+                        echo '</select>';
+                    } else {
+                        echo '<input type="hidden" name="dmm_currency" id="dmm_currency" value="' .
+                             esc_attr(get_option('dmm_currency', 'EUR')) . '" />';
+                    }
+                    ?>
 
-                        if (get_option('dmm_amount')) {
-                            if (get_option('dmm_free_input')) {
-                                echo '<select id="dmm_dd" style="width: 100%" class="' .
-                                     esc_attr(get_option('dmm_fields_cls')) .
-                                     '" onchange="if(this.value!=\'--\'){document.getElementById(\'dmm_amount\').value=this.value.replace(\',\', \'.\');document.getElementById(\'dmm_amount\').style.display = \'none\';}else{document.getElementById(\'dmm_amount\').style.display = \'block\';}">';
-                                echo '<option value="--">' . esc_html__('Enter your own amount', 'doneren-met-mollie') .
-                                     '</option>';
-                            } else {
-                                echo '<select style="width: 100%" id="dmm_amount" name="dmm_amount" class="' .
-                                     esc_attr(get_option('dmm_fields_cls')) . '" >';
-                            }
+                    <div class="dmm-amount-container">
+                    <?php
+                    echo '<p><label>' .
+                         esc_html__('Amount', 'doneren-met-mollie') .
+                         ' (<span id="dmm_currency_symbol"></span>) <span style="color:red;">*</span>' .
+                         '</label></p>';
 
-                            foreach (explode('/', get_option('dmm_amount')) as $amount) {
-                                echo '<option value="' . trim(esc_attr($amount)) . '"' .
-                                     (get_option('dmm_default_amount') == trim($amount) ? ' selected' : '') . '>' .
-                                     esc_html($amount) . '</option>';
-                            }
-                            echo '</select>';
-                        }
-
+                    if (get_option('dmm_amount')) {
+                        echo '<div class="dmm-amount-radio-container">';
                         if (get_option('dmm_free_input')) {
-                            echo '<span style="display:block;overflow:auto;">
-                                  <input type="number" step="any" min="' . (str_replace(',', '.', esc_attr(get_option('dmm_minimum_amount'))) ?: 1) . '" id="dmm_amount" name="dmm_amount" class="' .
-                                 esc_attr(get_option('dmm_fields_cls')) . '" value="' .
-                                 esc_attr(isset($_POST["dmm_amount"]) ? $_POST["dmm_amount"] :
-                                         str_replace(',', '.', get_option('dmm_default_amount'))) .
-                                 '" style="width: 100%;float:left;"></span>';
-                        } else {
-                            echo '<input type="hidden" name="dmm_currency" id="dmm_currency" value="' .
-                                 esc_attr(get_option('dmm_currency', 'EUR')) . '">';
+                            echo '<input type="radio" id="dmm_amount_free"'.
+                                 ' name="dmm_amount_choice"'.
+                                 ' class="dmm-radio-button ' . esc_attr(get_option('dmm_fields_cls')) . '"'.
+                                 ' value="--"'.
+                                 (get_option('dmm_default_amount') == '' ? ' checked' : '') .
+                                 ' onchange="document.getElementById(\'dmm_amount\').value=\'\';document.getElementById(\'dmm_amount\').style.display = \'block\';">';
+                            echo '<label for="dmm_amount_free">' . esc_html__('Enter your own amount', 'doneren-met-mollie') . '</label>';
                         }
-                        ?>
-                    </p> <br><br>
+                        foreach (explode('/', get_option('dmm_amount')) as $index => $amount) {
+                            echo '<input type="radio" id="dmm_amount_'.$index.'"'.
+                                 ' name="dmm_amount_choice"'.
+                                 ' value="' . trim(esc_attr($amount)) . '"'.
+                                 ' onchange="document.getElementById(\'dmm_amount\').value=this.value.replace(\',\', \'.\');document.getElementById(\'dmm_amount\').style.display = \'none\';"' .
+                                 ' class="dmm-radio-button ' . esc_attr(get_option('dmm_fields_cls')) . '"' .
+                                 (get_option('dmm_default_amount') == trim($amount) ? ' checked' : '') .
+                                 '/>';
+                            echo '<label for="dmm_amount_'.$index.'">' . esc_html($amount) . '</label>';
+                        }
+                        echo '</div>';
+                    }
 
-                    <p><?php echo $this->dmm_payment_methods($mollie); ?></p>
-
-                    <br><br>
+                    if (get_option('dmm_free_input')) {
+                        echo '<div>'.
+                               '<input type="number" step="any"'.
+                               ' min="' . (str_replace(',', '.', esc_attr(get_option('dmm_minimum_amount'))) ?: 1) . '"'.
+                               ' id="dmm_amount"'.
+                               ' name="dmm_amount"'.
+                               ' class="' . esc_attr(get_option('dmm_fields_cls')) . '"'.
+                               ' value="' . esc_attr(isset($_POST["dmm_amount"]) ? $_POST["dmm_amount"] : str_replace(',', '.', get_option('dmm_default_amount'))) . '"'.
+                               ' />'.
+                             '</div>';
+                    } else {
+                        echo '<input type="hidden"'.
+                             ' name="dmm_amount"'.
+                             ' id="dmm_amount"'.
+                             ' value="' . esc_attr(isset($_POST["dmm_amount"]) ? $_POST["dmm_amount"] : str_replace(',', '.', get_option('dmm_default_amount'))) . '"'.
+                             ' />';
+                    }
+                    ?>
+                    </div>
+                    <div class="dmm-methods-container">
+                      <?php echo $this->dmm_payment_methods($mollie); ?>
+                    </div>
                     <script>
                         window.onload = function () {
-                            var dmm_dd = document.getElementById('dmm_dd');
-                            if (dmm_dd !== null) {
-                                if (dmm_dd.value !== '--') {
-                                    document.getElementById('dmm_amount').value = document.getElementById('dmm_dd').value.replace(',', '.');
+                            var dmm_amount_free = document.getElementById('dmm_amount_free');
+                            var dmm_amount_value = '<?php echo esc_attr(isset($_POST["dmm_amount"]) ? $_POST["dmm_amount"] : str_replace(',', '.', get_option('dmm_default_amount'))); ?>';
+                            if (dmm_amount_free !== null) {
+                                if (!dmm_amount_free.checked) {
+                                    // FIXME getElementByName
+                                    document.getElementById('dmm_amount').value = dmm_amount_value;
                                     document.getElementById('dmm_amount').style.display = 'none';
                                 }
                             }
                             <?php if (get_option('dmm_recurring')) { ?>
-                            if (document.getElementById('dmm_interval').value !== 'one') {
+                            // FIXME getElementByName dmm_recurring_interval
+                            // var form = document.querySelector("form");
+                            // var data = new FormData(form);
+                            // document.querySelector('input[type=radio][name=dmm_recurring_interval]')
+                            if (!document.getElementById('dmm_interval_one').checked) {
                                 document.getElementById('dmm_permission').style.display = 'block';
                             }
-                            dmm_recurring_methods(document.getElementById('dmm_interval').value);
+                            dmm_toggle_recurring_methods(document.getElementById('dmm_interval_one').checked);
                             <?php } ?>
                             dmm_multicurrency_methods(document.getElementById('dmm_currency').value);
                         }
                     </script>
-                    <label for="dmm_permission_field" id="dmm_permission" style="display:none"><input type="checkbox"
-                                                                                                      id="dmm_permission_field"
-                                                                                                      name="dmm_permission"> <?php echo sprintf(__('I hereby authorize %s to collect the amount shown above from my account periodically.', 'doneren-met-mollie'), esc_html(get_option('dmm_name_foundation'))); ?>
-                    </label>
+                    <p><label for="dmm_permission_field" id="dmm_permission" style="display:none">
+                      <input type="checkbox"
+                          id="dmm_permission_field"
+                          name="dmm_permission">
+                      <?php echo sprintf(__('I hereby authorize %s to collect the amount shown above from my account periodically.', 'doneren-met-mollie'), esc_html(get_option('dmm_name_foundation'))); ?>
+                    </label></p>
 
                     <?php if (isset($dmm_fields['GDPR checkbox']['active']) &&
                               $dmm_fields['GDPR checkbox']['active']) { ?>
-                        <p>
-                            <label for="dmm_gdpr"><input type="checkbox" id="dmm_gdpr" name="dmm_gdpr">
-                                <?php echo __('I hereby agree to the', 'doneren-met-mollie'); ?>
-                                <a target="_blank" href="<?php echo esc_attr(get_option('dmm_gdpr_link', '#')); ?>">
-                                    <?php echo __('Privacy Policy', 'doneren-met-mollie'); ?>
-                                </a>
-                            </label>
-
-                        </p>
+                        <p><label for="dmm_gdpr"><input type="checkbox" id="dmm_gdpr" name="dmm_gdpr">
+                            <?php echo __('I hereby agree to the', 'doneren-met-mollie'); ?>
+                            <a target="_blank" href="<?php echo esc_attr(get_option('dmm_gdpr_link', '#')); ?>">
+                                <?php echo __('Privacy Policy', 'doneren-met-mollie'); ?>
+                            </a>
+                        </label></p>
                     <?php } ?>
 
                     <?php
                     // Hook to add custom form fields at the bottom of the form
                     do_action('dmm_donate_form_bottom'); ?>
 
+                    <div class="dmm-button-container">
                     <input type="submit"
                            name="dmm_submitted"
                            class="<?php echo esc_attr(get_option('dmm_button_cls')); ?>"
                            value="<?php echo esc_attr(__('Donate', 'doneren-met-mollie')); ?>">
-
+                    </div>
                 </form>
                 <?php
 
@@ -897,36 +937,40 @@ class Dmm_Start
             $scriptCC = '';
             if ($recurring['cc'] === false) {
                 $scriptCC = '
-                var x = document.getElementsByClassName("dmm_cc");
+                var labels = document.getElementsByClassName("dmm_cc");
                 var i;
-                for (i = 0; i < x.length; i++) {
-                    x[i].style.display = value!="one" ? "none" : "block";
-                    x[i].disabled = value!="one" ? "disabled" : "";
+                for (i = 0; i < labels.length; i++) {
+                    labels[i].style.display = !interval_value_one_checked ? "none" : "block";
+                    labels[i].disabled = !interval_value_one_checked ? "disabled" : "";
                 }';
             }
 
             $scriptDD = '';
             if ($recurring['dd'] === false) {
                 $scriptDD = '
-                var x = document.getElementsByClassName("dmm_dd");
+                var labels = document.getElementsByClassName("dmm_dd");
                 var i;
-                for (i = 0; i < x.length; i++) {
-                    x[i].style.display = value!="one" ? "none" : "block";
-                    x[i].disabled = value!="one" ? "disabled" : "";
+                for (i = 0; i < labels.length; i++) {
+                    labels[i].style.display = !interval_value_one_checked ? "none" : "block";
+                    labels[i].disabled = !interval_value_one_checked ? "disabled" : "";
                 }';
             }
 
             $methods .= '
             <script>
-            function dmm_recurring_methods(value) {
-                var x = document.getElementsByClassName("dmm_recurring");
+            function dmm_toggle_recurring_methods(interval_value_one_checked) {
+                var labels = document.getElementsByClassName("dmm_recurring");
                 var i;
-                for (i = 0; i < x.length; i++) {
-                    x[i].style.display = (value!="one" ? "none" : "block");
-                    x[i].disabled = (value!="one" ? "disabled" : "");
+                for (i = 0; i < labels.length; i++) {
+                    labels[i].style.display = (!interval_value_one_checked ? "none" : "block");
+                    labels[i].disabled = (!interval_value_one_checked ? "disabled" : "");
                 }
                 ' . $scriptCC . $scriptDD . '
-                document.getElementById("dmm_permission").style.display = (value == "one" ? "none" : "block");
+                var visibleMethodsRadios = Array.from(document.querySelectorAll(\'.dmm-method-label\')).filter(el => el.style.display != \'none\');
+                if (visibleMethodsRadios.length) {
+                  visibleMethodsRadios[0].querySelector(\'input[type="radio"]\').checked=true;
+                }
+                document.getElementById("dmm_permission").style.display = (interval_value_one_checked ? "none" : "block");
             }
             </script>';
         }
@@ -938,14 +982,14 @@ class Dmm_Start
 
         $methods .= '
         <script>
-        function dmm_multicurrency_methods(value) {
+        function dmm_multicurrency_methods(currency_value) {
             let dmm_currencies = ' . json_encode($currencySymbol) . ';
-            document.getElementById("dmm_currency_symbol").innerHTML = dmm_currencies[value];
+            document.getElementById("dmm_currency_symbol").innerHTML = dmm_currencies[currency_value];
 
             let x = document.getElementsByClassName("dmm_nomc");
             for (let i = 0; i < x.length; i++) {
-                x[i].style.display = (value!="EUR" ? "none" : "block");
-                x[i].disabled = (value!="EUR" ? "disabled" : "");
+                x[i].style.display = (currency_value!="EUR" ? "none" : "block");
+                x[i].disabled = (currency_value!="EUR" ? "disabled" : "");
             }
         }
         </script>';
@@ -953,17 +997,26 @@ class Dmm_Start
         $first = true;
         if ($option === 'list') {
             foreach ($mollie->all('methods') as $method) {
-                $methods .= '<label class="' . esc_attr($this->dmm_pm_class($method->id)) .
-                            '"><input type="radio" name="dmm_method" value="' . esc_attr($method->id) . '" ' .
-                            ($first ? 'checked' : '') .
-                            '> <img style="vertical-align:middle;display:inline-block" src="' .
-                            sanitize_text_field($method->image->size1x) . '"> ' .
-                            esc_html__($method->description, 'doneren-met-mollie') . '<br></label>';
+                $methods .= '<label'.
+                            ' for="dmm_method_' . $method->id . '"' .
+                            ' class="dmm-method-label ' . esc_attr($this->dmm_pm_class($method->id)) . '"'.
+                            '>'.
+                            '<input type="radio"'.
+                            ' id="dmm_method_' . $method->id . '"' .
+                            ' name="dmm_method"'.
+                            ' value="' . esc_attr($method->id) . '"' .
+                            ($first ? ' checked' : '') .
+                            ' />'.
+                            ' <img style="vertical-align:middle;display:inline-block"'.
+                            ' src="' . sanitize_text_field($method->image->size1x) . '" />'.
+                            ' ' . esc_html__($method->description, 'doneren-met-mollie') .
+                            '<br>'.
+                            '</label>';
                 $first   = false;
             }
         } elseif ($option === 'list_no_icons') {
             foreach ($mollie->all('methods') as $method) {
-                $methods .= '<label class="' . esc_attr($this->dmm_pm_class($method->id)) .
+                $methods .= '<label class="dmm-method-label ' . esc_attr($this->dmm_pm_class($method->id)) .
                             '"><input type="radio" name="dmm_method" value="' . esc_attr($method->id) . '" ' .
                             ($first ? 'checked' : '') . '> ' . esc_html__($method->description, 'doneren-met-mollie') .
                             '<br></label>';
@@ -971,7 +1024,7 @@ class Dmm_Start
             }
         } elseif ($option === 'list_icons') {
             foreach ($mollie->all('methods') as $method) {
-                $methods .= '<label class="' . esc_attr($this->dmm_pm_class($method->id)) .
+                $methods .= '<label class="dmm-method-label ' . esc_attr($this->dmm_pm_class($method->id)) .
                             '"><input type="radio" name="dmm_method" value="' . esc_attr($method->id) . '" ' .
                             ($first ? 'checked' : '') .
                             '> <img style="vertical-align:middle;display:inline-block" src="' .
@@ -979,7 +1032,7 @@ class Dmm_Start
                 $first   = false;
             }
         } elseif ($option === 'dropdown') {
-            $methods .= '<select style="width: 100%" name="dmm_method" class="' .
+            $methods .= '<select  name="dmm_method" class="' .
                         esc_attr(get_option('dmm_fields_cls')) . '">';
             $methods .= '<option value="">== ' . esc_html__('Choose a payment method', 'doneren-met-mollie') .
                         ' ==</option>';
@@ -1003,7 +1056,7 @@ class Dmm_Start
      */
     private function dmm_recurring_method($id)
     {
-        $recurring = ['ideal', 'bancontact', 'kbc', 'belfius', 'sofort', 'creditcard', 'eps', 'giropay'];
+        $recurring = ['applepay', 'bancontact', 'belfius', 'creditcard', 'eps', 'giropay', 'ideal', 'kbc', 'mybank', 'paypal', 'sofort'];
 
         return !in_array($id, $recurring) ? 'dmm_recurring' : ($id == 'creditcard' ? 'dmm_cc' : 'dmm_dd');
     }
@@ -1049,7 +1102,7 @@ class Dmm_Start
     {
         $projects = explode(PHP_EOL, sanitize_textarea_field(get_option('dmm_projects')));
 
-        $projectList = '<select style="width: 100%" id="dmm_project" name="dmm_project" class="' .
+        $projectList = '<select  id="dmm_project" name="dmm_project" class="' .
                        esc_attr(get_option('dmm_fields_cls')) . '">';
         foreach ($projects as $project) {
             $projectList .= '<option' . ($selected === $project ? ' selected' : '') . '>' . esc_attr($project) .
