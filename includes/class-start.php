@@ -924,48 +924,15 @@ class Dmm_Start
         $methods = '';
 
         if (get_option('dmm_recurring')) {
-            $recurring = ['dd' => false, 'cc' => false];
-            foreach ($mollie->all('methods', ['sequenceType' => 'recurring']) as $method) {
-                if ($method->id === 'directdebit') {
-                    $recurring['dd'] = true;
-                }
-                if ($method->id === 'creditcard') {
-                    $recurring['cc'] = true;
-                }
-            }
-
-            $scriptCC = '';
-            if ($recurring['cc'] === false) {
-                $scriptCC = '
-                var labels = document.getElementsByClassName("dmm_cc");
-                var i;
-                for (i = 0; i < labels.length; i++) {
-                    labels[i].style.display = !interval_value_one_checked ? "none" : "block";
-                    labels[i].disabled = !interval_value_one_checked ? "disabled" : "";
-                }';
-            }
-
-            $scriptDD = '';
-            if ($recurring['dd'] === false) {
-                $scriptDD = '
-                var labels = document.getElementsByClassName("dmm_dd");
-                var i;
-                for (i = 0; i < labels.length; i++) {
-                    labels[i].style.display = !interval_value_one_checked ? "none" : "block";
-                    labels[i].disabled = !interval_value_one_checked ? "disabled" : "";
-                }';
-            }
-
             $methods .= '
             <script>
             function dmm_toggle_recurring_methods(interval_value_one_checked) {
-                var labels = document.getElementsByClassName("dmm_recurring");
+                var labels = document.getElementsByClassName("dmm_recurring_invalid_first_payment");
                 var i;
                 for (i = 0; i < labels.length; i++) {
-                    labels[i].style.display = (!interval_value_one_checked ? "none" : "block");
-                    labels[i].disabled = (!interval_value_one_checked ? "disabled" : "");
+                    labels[i].style.display = (interval_value_one_checked ? "block" : "none");
+                    labels[i].disabled = (interval_value_one_checked ? "" : "disabled");
                 }
-                ' . $scriptCC . $scriptDD . '
                 var visibleMethodsRadios = Array.from(document.querySelectorAll(\'.dmm-method-label\')).filter(el => el.style.display != \'none\');
                 if (visibleMethodsRadios.length) {
                   visibleMethodsRadios[0].querySelector(\'input[type="radio"]\').checked=true;
@@ -999,7 +966,7 @@ class Dmm_Start
             foreach ($mollie->all('methods') as $method) {
                 $methods .= '<label'.
                             ' for="dmm_method_' . $method->id . '"' .
-                            ' class="dmm-method-label ' . esc_attr($this->dmm_pm_class($method->id)) . '"'.
+                            ' class="dmm-method-label ' . esc_attr($this->dmm_pm_class($mollie, $method->id)) . '"'.
                             '>'.
                             '<input type="radio"'.
                             ' id="dmm_method_' . $method->id . '"' .
@@ -1016,7 +983,7 @@ class Dmm_Start
             }
         } elseif ($option === 'list_no_icons') {
             foreach ($mollie->all('methods') as $method) {
-                $methods .= '<label class="dmm-method-label ' . esc_attr($this->dmm_pm_class($method->id)) .
+                $methods .= '<label class="dmm-method-label ' . esc_attr($this->dmm_pm_class($mollie, $method->id)) .
                             '"><input type="radio" name="dmm_method" value="' . esc_attr($method->id) . '" ' .
                             ($first ? 'checked' : '') . '> ' . esc_html__($method->description, 'doneren-met-mollie') .
                             '<br></label>';
@@ -1024,7 +991,7 @@ class Dmm_Start
             }
         } elseif ($option === 'list_icons') {
             foreach ($mollie->all('methods') as $method) {
-                $methods .= '<label class="dmm-method-label ' . esc_attr($this->dmm_pm_class($method->id)) .
+                $methods .= '<label class="dmm-method-label ' . esc_attr($this->dmm_pm_class($mollie, $method->id)) .
                             '"><input type="radio" name="dmm_method" value="' . esc_attr($method->id) . '" ' .
                             ($first ? 'checked' : '') .
                             '> <img style="vertical-align:middle;display:inline-block" src="' .
@@ -1037,7 +1004,7 @@ class Dmm_Start
             $methods .= '<option value="">== ' . esc_html__('Choose a payment method', 'doneren-met-mollie') .
                         ' ==</option>';
             foreach ($mollie->all('methods') as $method) {
-                $methods .= '<option class="' . esc_attr($this->dmm_pm_class($method->id)) . '" value="' . $method->id .
+                $methods .= '<option class="' . esc_attr($this->dmm_pm_class($mollie, $method->id)) . '" value="' . $method->id .
                             '">' . esc_html__($method->description, 'doneren-met-mollie') . '</option>';
             }
             $methods .= '</select>';
@@ -1054,11 +1021,14 @@ class Dmm_Start
      * @return string
      * @since 2.1.1
      */
-    private function dmm_recurring_method($id)
+    private function dmm_valid_recurring_first_payment_method($mollie, $id)
     {
-        $recurring = ['applepay', 'bancontact', 'belfius', 'creditcard', 'eps', 'giropay', 'ideal', 'kbc', 'mybank', 'paypal', 'sofort'];
+        $recurring = array();
+        foreach ($mollie->all('methods', ['sequenceType' => 'recurring']) as $method) {
+            $recurring[] = $method->id;
+        }
 
-        return !in_array($id, $recurring) ? 'dmm_recurring' : ($id == 'creditcard' ? 'dmm_cc' : 'dmm_dd');
+        return in_array($id, $recurring) ? 'dmm_recurring_valid_first_payment' : 'dmm_recurring_invalid_first_payment';
     }
 
     /**
@@ -1085,9 +1055,9 @@ class Dmm_Start
      * @return string
      * @since 2.5.0
      */
-    private function dmm_pm_class($id)
+    private function dmm_pm_class($mollie, $id)
     {
-        return $this->dmm_recurring_method($id) . ' ' . $this->dmm_multicurrency_method($id);
+        return $this->dmm_valid_recurring_first_payment_method($mollie, $id) . ' ' . $this->dmm_multicurrency_method($id);
     }
 
     /**
